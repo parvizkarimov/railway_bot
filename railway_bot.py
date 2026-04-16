@@ -71,7 +71,7 @@ async def check_trains(from_code, to_code, date):
 def parse_trains(data):
     trains = []
     try:
-        for train in data.get("directions", {}).get("forward", []):
+        for train in data.get("data", data).get("directions", {}).get("forward", []):
             cars = train.get("cars", [])
             total = sum(c.get("freeSeats", 0) for c in cars)
             car_info = [f"{c['type']}: {c['freeSeats']} joy" for c in cars if c.get("freeSeats", 0) > 0]
