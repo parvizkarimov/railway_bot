@@ -10,12 +10,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
-from aiohttp_socks import ProxyConnector
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
-COOKIE = os.getenv("RAILWAY_COOKIE", "")
-XSRF_TOKEN = os.getenv("XSRF_TOKEN", "")
-PROXY = os.getenv("PROXY_URL", "")  # masalan: socks5://user:pass@host:port
 CHECK_INTERVAL = 300
 
 STATIONS = {
@@ -30,6 +26,104 @@ STATIONS = {
     "Urganch": "2909000",
     "Nukus": "2903400",
 }
+
+# Global cookie cache
+_cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
+
+async def get_fresh_cookie():
+    """Saytga kirib yangi cookie olish"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://eticket.railway.uz/uz/home",
+                headers={"User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36"},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as r:
+                cookies = r.cookies
+                cookie_str = "; ".join([f"{k}={v.value}" for k, v in cookies.items()])
+                xsrf = cookies.get("XSRF-TOKEN", {})
+                xsrf_val = xsrf.value if hasattr(xsrf, 'value') else ""
+                
+                if cookie_str:
+                    _cookie_cache["cookie"] = cookie_str
+                    _cookie_cache["xsrf"] = xsrf_val
+                    _cookie_cache["updated"] = datetime.now()
+                    logging.info(f"Cookie yangilandi: {len(cookie_str)} belgi")
+                    return cookie_str, xsrf_val
+    except Exception as e:
+        logging.error(f"Cookie olishda xato: {e}")
+    return _cookie_cache["cookie"], _cookie_cache["xsrf"]
+
+async def check_trains(from_code, to_code, date):
+    """Poyezdlarni tekshirish"""
+    # Cookie 30 daqiqadan eski bo'lsa yangilash
+    if not _cookie_cache["updated"] or \
+       (datetime.now() - _cookie_cache["updated"]).seconds > 1800:
+        cookie, xsrf = await get_fresh_cookie()
+    else:
+        cookie, xsrf = _cookie_cache["cookie"], _cookie_cache["xsrf"]
+
+    url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Cookie": cookie,
+        "X-Xsrf-Token": xsrf,
+        "Device-Type": "BROWSER",
+        "Origin": "https://eticket.railway.uz",
+        "Referer": "https://eticket.railway.uz/uz/home",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36",
+    }
+    payload = {"directions": {"forward": {
+        "date": date,
+        "depStationCode": from_code,
+        "arvStationCode": to_code
+    }}}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url, json=payload, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as r:
+                logging.info(f"API status: {r.status}")
+                if r.status == 200:
+                    return await r.json(content_type=None)
+                elif r.status == 401 or r.status == 403:
+                    # Cookie eskirgan — yangilash
+                    logging.info("Cookie eskirgan, yangilanmoqda...")
+                    cookie, xsrf = await get_fresh_cookie()
+                    headers["Cookie"] = cookie
+                    headers["X-Xsrf-Token"] = xsrf
+                    async with session.post(
+                        url, json=payload, headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as r2:
+                        if r2.status == 200:
+                            return await r2.json(content_type=None)
+                else:
+                    text = await r.text()
+                    logging.error(f"API xato: {r.status} - {text[:200]}")
+    except Exception as e:
+        logging.error(f"Ulanish xato: {type(e).__name__}: {e}")
+    return None
+
+def parse_trains(data):
+    trains = []
+    try:
+        for train in data.get("directions", {}).get("forward", []):
+            cars = train.get("cars", [])
+            total = sum(c.get("freeSeats", 0) for c in cars)
+            car_info = [f"{c['type']}: {c['freeSeats']} joy"
+                       for c in cars if c.get("freeSeats", 0) > 0]
+            trains.append({
+                "name": train.get("brand", "?"),
+                "dep": train.get("departureDate", ""),
+                "arr": train.get("arrivalDate", ""),
+                "total": total, "cars": car_info
+            })
+    except Exception as e:
+        logging.error(f"Parse xato: {e}")
+    return trains
 
 def init_db():
     conn = sqlite3.connect("bot.db")
@@ -53,64 +147,7 @@ def db(query, params=(), fetch=False):
     conn.close()
     return result
 
-def get_connector():
-    if PROXY:
-        return ProxyConnector.from_url(PROXY, ssl=False)
-    return aiohttp.TCPConnector(ssl=False)
-
-async def check_trains(from_code, to_code, date):
-    url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Cookie": COOKIE,
-        "X-Xsrf-Token": XSRF_TOKEN,
-        "Device-Type": "BROWSER",
-        "Origin": "https://eticket.railway.uz",
-        "Referer": "https://eticket.railway.uz/uz/home",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36",
-    }
-    payload = {"directions": {"forward": {
-        "date": date, "depStationCode": from_code, "arvStationCode": to_code
-    }}}
-    try:
-        async with aiohttp.ClientSession(connector=get_connector()) as session:
-            async with session.post(url, json=payload, headers=headers,
-                                    timeout=aiohttp.ClientTimeout(total=30)) as r:
-                logging.info(f"API status: {r.status}")
-                if r.status == 200:
-                    return await r.json(content_type=None)
-                else:
-                    text = await r.text()
-                    logging.error(f"API xato: {r.status} - {text[:200]}")
-    except Exception as e:
-        logging.error(f"Ulanish xato: {type(e).__name__}: {e}")
-    return None
-
-def parse_trains(data):
-    trains = []
-    try:
-        for train in data.get("directions", {}).get("forward", []):
-            cars = train.get("cars", [])
-            total = sum(c.get("freeSeats", 0) for c in cars)
-            car_info = [f"{c['type']}: {c['freeSeats']} joy"
-                        for c in cars if c.get("freeSeats", 0) > 0]
-            trains.append({
-                "name": train.get("brand", "?"),
-                "dep": train.get("departureDate", ""),
-                "arr": train.get("arrivalDate", ""),
-                "total": total, "cars": car_info
-            })
-    except Exception as e:
-        logging.error(f"Parse xato: {e}")
-    return trains
-
-# Bot proxy bilan
-if PROXY:
-    bot = Bot(token=BOT_TOKEN, proxy=PROXY)
-else:
-    bot = Bot(token=BOT_TOKEN)
-
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 class Form(StatesGroup):
@@ -147,22 +184,19 @@ async def cmd_start(msg: types.Message):
 
 @dp.message(Command("test"))
 async def cmd_test(msg: types.Message):
-    await msg.answer("🔍 Tekshirilmoqda...")
+    await msg.answer("🔍 Cookie olinmoqda va tekshirilmoqda...")
+    cookie, xsrf = await get_fresh_cookie()
     result = await check_trains("2900000", "2900700", "2026-04-27")
     if result:
         trains = parse_trains(result)
-        await msg.answer(f"✅ Ishlayapti! {len(trains)} ta poyezd topildi.")
+        await msg.answer(f"✅ Hammasi ishlayapti!\n🍪 Cookie: {len(cookie)} belgi\n🚂 Poyezdlar: {len(trains)} ta")
     else:
-        await msg.answer(
-            f"❌ Xato!\n"
-            f"Cookie: {len(COOKIE)} belgi\n"
-            f"Proxy: {PROXY or 'Yo\'q'}")
+        await msg.answer(f"❌ Xato!\n🍪 Cookie: {len(cookie)} belgi\n🔑 XSRF: {xsrf[:20] if xsrf else 'Yo\'q'}")
 
 @dp.message(Command("kuzat"))
 async def cmd_watch(msg: types.Message, state: FSMContext):
     user_id = msg.from_user.id
-    users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?",
-               (user_id,), fetch=True)
+    users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?", (user_id,), fetch=True)
     is_premium = False
     if users and users[0][0]:
         if users[0][1] and datetime.fromisoformat(users[0][1]) > datetime.now():
@@ -171,8 +205,7 @@ async def cmd_watch(msg: types.Message, state: FSMContext):
                (user_id,), fetch=True)[0][0]
     if count >= 1 and not is_premium:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna",
-                                 callback_data="buy_premium")
+            InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna", callback_data="buy_premium")
         ]])
         await msg.answer(
             f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz.\nBepul limit: 1 ta",
@@ -214,12 +247,10 @@ async def got_date(msg: types.Message, state: FSMContext):
     await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains(data["from_code"], data["to_code"], date)
     db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
-       (msg.from_user.id, data["from_st"], data["to_st"],
-        data["from_code"], data["to_code"], date))
+       (msg.from_user.id, data["from_st"], data["to_st"], data["from_code"], data["to_code"], date))
     if not result:
-        await msg.answer(
-            "⚠️ Hozir ma'lumot olinmadi, lekin kuzatuv saqlandi.\n"
-            f"🔔 Har {CHECK_INTERVAL//60} daqiqada tekshirib turaman!")
+        await msg.answer("⚠️ Hozir ma'lumot olinmadi, lekin kuzatuv saqlandi.\n"
+                        f"🔔 Har {CHECK_INTERVAL//60} daqiqada tekshirib turaman!")
         return
     trains = parse_trains(result)
     text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
@@ -251,7 +282,7 @@ async def cmd_my(msg: types.Message):
         buttons.append([InlineKeyboardButton(
             text=f"❌ {s[1]}→{s[2]} ({s[3]})", callback_data=f"del|{s[0]}")])
     await msg.answer(text, parse_mode="Markdown",
-                     reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
 
 @dp.callback_query(F.data.startswith("del|"))
 async def del_sub(cb: types.CallbackQuery):
@@ -312,6 +343,7 @@ async def checker():
 
 async def main():
     init_db()
+    await get_fresh_cookie()  # Dastlab cookie olish
     asyncio.create_task(checker())
     logging.info("Bot ishga tushdi!")
     await dp.start_polling(bot)
