@@ -13,6 +13,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
+ENV_COOKIE = os.getenv("RAILWAY_COOKIE", "")
+ENV_XSRF = os.getenv("XSRF_TOKEN", "")
 CHECK_INTERVAL = 300
 
 STATIONS = {
@@ -28,136 +30,42 @@ STATIONS = {
     "Nukus": "2903400",
 }
 
-_session = None
-_xsrf = ""
-_cookie_str = ""
-
-async def get_session():
-    global _session, _xsrf, _cookie_str
-    
-    if _session:
-        try:
-            await _session.close()
-        except:
-            pass
-    
-    jar = aiohttp.CookieJar(unsafe=True)
-    connector = aiohttp.TCPConnector(ssl=False)
-    _session = aiohttp.ClientSession(connector=connector, cookie_jar=jar)
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "uz-UZ,uz;q=0.9,ru;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    }
-    
-    try:
-        # 1. Asosiy sahifaga kirish
-        async with _session.get(
-            "https://eticket.railway.uz/uz/home",
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=30),
-            allow_redirects=True
-        ) as r:
-            logging.info(f"GET status: {r.status}")
-            body = await r.text()
-            
-            # Cookie larni tekshirish
-            all_cookies = {}
-            for cookie in jar:
-                all_cookies[cookie.key] = cookie.value
-            
-            logging.info(f"Cookie lar: {list(all_cookies.keys())}")
-            
-            # XSRF tokenni cookie dan olish
-            if "XSRF-TOKEN" in all_cookies:
-                _xsrf = all_cookies["XSRF-TOKEN"]
-                logging.info(f"XSRF cookie dan olindi: {_xsrf[:20]}")
-            
-            # XSRF tokenni HTML dan qidirish
-            if not _xsrf:
-                patterns = [
-                    r'XSRF-TOKEN["\s]*:["\s]*([a-f0-9\-]+)',
-                    r'csrf[_-]?token["\s]*:["\s]*["\']([a-f0-9\-]+)',
-                    r'_token["\s]*=["\s]*["\']([a-f0-9\-]+)',
-                    r'xsrf["\s]*=["\s]*["\']([a-f0-9\-]+)',
-                ]
-                for pattern in patterns:
-                    match = re.search(pattern, body, re.IGNORECASE)
-                    if match:
-                        _xsrf = match.group(1)
-                        logging.info(f"XSRF HTML dan olindi: {_xsrf[:20]}")
-                        break
-            
-            # Cookie string yasash
-            _cookie_str = "; ".join([f"{k}={v}" for k, v in all_cookies.items()])
-            logging.info(f"Cookie string: {len(_cookie_str)} belgi")
-            
-            return bool(_xsrf)
-            
-    except Exception as e:
-        logging.error(f"Session xato: {type(e).__name__}: {e}")
-        return False
-
 async def check_trains(from_code, to_code, date):
-    global _session, _xsrf, _cookie_str
-    
-    if not _xsrf:
-        await get_session()
-    
-    if not _xsrf:
-        logging.error("XSRF token yo'q!")
-        return None
-
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "X-Xsrf-Token": _xsrf,
-        "Cookie": _cookie_str,
+        "Cookie": ENV_COOKIE,
+        "X-Xsrf-Token": ENV_XSRF,
         "Device-Type": "BROWSER",
         "Origin": "https://eticket.railway.uz",
         "Referer": "https://eticket.railway.uz/uz/home",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+        "Sec-Ch-Ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "Accept-Language": "uz",
     }
     payload = {"directions": {"forward": {
         "date": date, "depStationCode": from_code, "arvStationCode": to_code
     }}}
-    
     try:
-        async with _session.post(
-            url, json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=30)
-        ) as r:
-            logging.info(f"API status: {r.status}")
-            if r.status == 200:
-                return await r.json(content_type=None)
-            elif r.status in [401, 403]:
-                logging.info("Session yangilanmoqda...")
-                _xsrf = ""
-                await get_session()
-                if _xsrf:
-                    headers["X-Xsrf-Token"] = _xsrf
-                    headers["Cookie"] = _cookie_str
-                    async with _session.post(
-                        url, json=payload, headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=30)
-                    ) as r2:
-                        logging.info(f"Retry status: {r2.status}")
-                        if r2.status == 200:
-                            return await r2.json(content_type=None)
-                        text = await r2.text()
-                        logging.error(f"Retry xato: {text[:300]}")
-            else:
-                text = await r.text()
-                logging.error(f"API xato: {r.status} - {text[:300]}")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url, json=payload, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as r:
+                logging.info(f"API status: {r.status}")
+                if r.status == 200:
+                    return await r.json(content_type=None)
+                else:
+                    text = await r.text()
+                    logging.error(f"API xato: {r.status} - {text[:300]}")
     except Exception as e:
         logging.error(f"Request xato: {type(e).__name__}: {e}")
-        _session = None
-        _xsrf = ""
     return None
 
 def parse_trains(data):
@@ -236,16 +144,17 @@ async def cmd_start(msg: types.Message):
 
 @dp.message(Command("test"))
 async def cmd_test(msg: types.Message):
-    await msg.answer("🔍 Session olinmoqda...")
-    ok = await get_session()
-    await msg.answer(f"Session: {'✅' if ok else '❌'}\nXSRF: {_xsrf[:20] if _xsrf else 'Yoq'}\nCookie: {len(_cookie_str)} belgi")
-    if ok:
-        result = await check_trains("2900000", "2900700", "2026-04-27")
-        if result:
-            trains = parse_trains(result)
-            await msg.answer(f"✅ API ishlayapti!\n🚂 Poyezdlar: {len(trains)} ta")
-        else:
-            await msg.answer("❌ API ishlamadi — Deploy Logs ga qarang")
+    await msg.answer(
+        f"🔍 Tekshirilmoqda...\n"
+        f"Cookie: {len(ENV_COOKIE)} belgi\n"
+        f"XSRF: {ENV_XSRF[:20] if ENV_XSRF else 'Yoq'}"
+    )
+    result = await check_trains("2900000", "2900700", "2026-04-27")
+    if result:
+        trains = parse_trains(result)
+        await msg.answer(f"✅ API ishlayapti!\n🚂 Poyezdlar: {len(trains)} ta")
+    else:
+        await msg.answer("❌ API ishlamadi — Deploy Logs ga qarang")
 
 @dp.message(Command("kuzat"))
 async def cmd_watch(msg: types.Message, state: FSMContext):
@@ -385,7 +294,6 @@ async def checker():
 
 async def main():
     init_db()
-    await get_session()
     asyncio.create_task(checker())
     logging.info("Bot ishga tushdi!")
     await dp.start_polling(bot)
