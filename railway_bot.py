@@ -71,7 +71,7 @@ async def check_trains(from_code, to_code, date):
 def parse_trains(data):
     trains = []
     try:
-        for train in data.get("data", data).get("directions", {}).get("forward", []):
+        for train in data.get("data", data).get("directions", {}).get("forward", {}).get("trains", []):
             cars = train.get("cars", [])
             total = sum(c.get("freeSeats", 0) for c in cars)
             car_info = [f"{c['type']}: {c['freeSeats']} joy" for c in cars if c.get("freeSeats", 0) > 0]
@@ -165,11 +165,11 @@ async def cmd_watch(msg: types.Message, state: FSMContext):
         if users[0][1] and datetime.fromisoformat(users[0][1]) > datetime.now():
             is_premium = True
     count = db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1", (user_id,), fetch=True)[0][0]
-    if count >= 1 and not is_premium:
+    if count >= 10 and not is_premium:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna", callback_data="buy_premium")
         ]])
-        await msg.answer(f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz.\nBepul limit: 1 ta",
+        await msg.answer(f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz.\nBepul limit: 10 ta",
                         parse_mode="Markdown", reply_markup=kb)
         return
     await msg.answer("🚉 *Qayerdan?*", parse_mode="Markdown", reply_markup=st_kb())
