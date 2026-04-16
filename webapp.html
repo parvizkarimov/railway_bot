@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Temir Yo'l Chiptalari</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); min-height: 100vh; }
+
+.app { max-width: 480px; margin: 0 auto; padding: 12px 16px; }
+
+.header { text-align: center; padding: 16px 0 20px; }
+.header h1 { font-size: 20px; font-weight: 600; }
+.header p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; }
+.tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--tg-theme-hint-color, #888); cursor: pointer; transition: all 0.2s; }
+.tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+.section { display: none; }
+.section.active { display: block; }
+
+.card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; opacity: 0.6; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-select, .form-input { width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); font-size: 15px; font-family: inherit; appearance: none; -webkit-appearance: none; }
+.form-select:focus, .form-input:focus { outline: 2px solid var(--tg-theme-button-color, #2EA6FF); }
+
+.swap-row { display: flex; justify-content: center; margin: -4px 0; }
+.swap-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; position: relative; }
+
+.btn-primary { width: 100%; padding: 14px; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+.btn-primary:active { opacity: 0.85; }
+
+.train-card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+.train-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.train-brand { font-size: 15px; font-weight: 600; }
+.train-num { font-size: 12px; opacity: 0.5; }
+.train-time-row { display: flex; align-items: center; gap: 0; }
+.time-big { font-size: 22px; font-weight: 700; }
+.time-mid { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.duration-text { font-size: 11px; opacity: 0.5; }
+.duration-line { width: 100%; height: 1px; background: rgba(0,0,0,0.15); }
+.station-small { font-size: 11px; opacity: 0.5; text-align: center; }
+.seats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; }
+.seat-tag.has { background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
+.seat-tag.nope { background: rgba(0,0,0,0.07); opacity: 0.6; }
+.btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.btn-watch.active { background: rgba(46, 166, 255, 0.1); }
+
+.watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.watch-info { flex: 1; }
+.watch-route { font-size: 15px; font-weight: 600; }
+.watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
+.watch-badge { font-size: 11px; padding: 4px 10px; border-radius: 8px; background: rgba(46, 166, 100, 0.15); color: #1a8a50; font-weight: 500; white-space: nowrap; }
+.btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
+
+.empty { text-align: center; padding: 50px 20px; opacity: 0.5; }
+.empty-ico { font-size: 40px; margin-bottom: 12px; }
+.empty-txt { font-size: 15px; }
+.empty-sub { font-size: 13px; margin-top: 6px; }
+
+.loading { text-align: center; padding: 30px; opacity: 0.6; }
+.spinner { width: 28px; height: 28px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--tg-theme-button-color, #2EA6FF); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result-header { font-size: 14px; opacity: 0.6; margin-bottom: 12px; padding: 0 4px; }
+.no-trains { text-align: center; padding: 30px; opacity: 0.5; font-size: 14px; }
+.error-msg { background: rgba(255,50,50,0.1); color: #cc2222; padding: 12px 14px; border-radius: 12px; font-size: 14px; margin-bottom: 12px; }
+.count-badge { background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); font-size: 11px; padding: 2px 7px; border-radius: 10px; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>🚂 Temir yo'l</h1>
+    <p>Bilet kuzatuvchi</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('search')">Qidirish</button>
+    <button class="tab" onclick="showTab('watches')">Kuzatuvlar<span id="cnt"></span></button>
+  </div>
+
+  <div id="search" class="section active">
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Qayerdan</label>
+        <select class="form-select" id="from"><option value="">Tanlang...</option></select>
+      </div>
+      <div class="swap-row">
+        <button class="swap-btn" onclick="swap()">⇅</button>
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label class="form-label">Qayerga</label>
+        <select class="form-select" id="to"><option value="">Tanlang...</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sana</label>
+        <input type="date" class="form-input" id="date">
+      </div>
+      <button class="btn-primary" onclick="search()">Qidirish</button>
+    </div>
+    <div id="results"></div>
+  </div>
+
+  <div id="watches" class="section">
+    <div id="wlist"></div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const BOT_URL = window.location.origin;
+
+const STATIONS = {
+  "Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800",
+  "Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880",
+  "Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172",
+  "Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"
+};
+
+function stName(code) {
+  return Object.keys(STATIONS).find(k => STATIONS[k] === code) || code;
+}
+
+let watches = [];
+try { watches = JSON.parse(localStorage.getItem('rw_watches') || '[]'); } catch(e) {}
+
+function saveWatches() {
+  localStorage.setItem('rw_watches', JSON.stringify(watches));
+  updateCnt();
+}
+
+function updateCnt() {
+  const el = document.getElementById('cnt');
+  el.innerHTML = watches.length ? `<span class="count-badge">${watches.length}</span>` : '';
+}
+
+function init() {
+  const f = document.getElementById('from');
+  const t = document.getElementById('to');
+  Object.keys(STATIONS).forEach(n => {
+    f.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
+    t.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
+  });
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date').value = today;
+  document.getElementById('date').min = today;
+  updateCnt();
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['search','watches'][i] === tab));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === tab));
+  if (tab === 'watches') renderWatches();
+}
+
+function swap() {
+  const f = document.getElementById('from');
+  const t = document.getElementById('to');
+  [f.value, t.value] = [t.value, f.value];
+}
+
+async function search() {
+  const from = document.getElementById('from').value;
+  const to = document.getElementById('to').value;
+  const date = document.getElementById('date').value;
+  const res = document.getElementById('results');
+
+  if (!from || !to) { res.innerHTML = '<div class="error-msg">Stansiyalarni tanlang!</div>'; return; }
+  if (from === to) { res.innerHTML = '<div class="error-msg">Boshqa stansiya tanlang!</div>'; return; }
+  if (!date) { res.innerHTML = '<div class="error-msg">Sanani kiriting!</div>'; return; }
+
+  res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
+
+  try {
+    const r = await fetch(`${BOT_URL}/api/trains`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, date })
+    });
+    const data = await r.json();
+    renderTrains(data.trains || [], from, to, date);
+  } catch(e) {
+    res.innerHTML = '<div class="error-msg">Xato yuz berdi. Qayta urining.</div>';
+  }
+}
+
+function renderTrains(trains, from, to, date) {
+  const res = document.getElementById('results');
+  const fromName = stName(from);
+  const toName = stName(to);
+
+  if (!trains.length) {
+    res.innerHTML = `<div class="result-header">${fromName} → ${toName}</div><div class="no-trains">Bu sanada poyezd topilmadi</div>`;
+    return;
+  }
+
+  let html = `<div class="result-header">${fromName} → ${toName} | ${trains.length} ta poyezd</div>`;
+  trains.forEach(t => {
+    const isW = watches.some(w => w.from === from && w.to === to && w.date === date);
+    const totalFree = (t.cars || []).reduce((s, c) => s + (c.freeSeats || 0), 0);
+    html += `<div class="train-card">
+      <div class="train-top">
+        <div><div class="train-brand">${t.brand || 'Poyezd'}</div><div class="train-num">${t.number || ''}</div></div>
+      </div>
+      <div class="train-time-row">
+        <div class="time-big">${(t.departureDate || '').split(' ')[1] || '--:--'}</div>
+        <div class="time-mid">
+          <div class="duration-text">${t.timeOnWay || ''}</div>
+          <div class="duration-line"></div>
+          <div class="station-small">${t.originRoute?.depStationName || fromName}</div>
+        </div>
+        <div class="time-big">${(t.arrivalDate || '').split(' ')[1] || '--:--'}</div>
+      </div>
+      <div class="seats">
+        ${(t.cars || []).map(c => `<span class="seat-tag ${c.freeSeats > 0 ? 'has' : 'nope'}">${c.type}: ${c.freeSeats > 0 ? c.freeSeats + ' joy' : 'joy yoq'}</span>`).join('') || `<span class="seat-tag has">Jami: ${totalFree} joy</span>`}
+      </div>
+      <button class="btn-watch ${isW ? 'active' : ''}" onclick="toggleWatch('${from}','${to}','${date}','${t.brand || ''}',this)">
+        ${isW ? '✓ Kuzatilmoqda' : '+ Kuzatuvga qo\'shish'}
+      </button>
+    </div>`;
+  });
+  res.innerHTML = html;
+}
+
+function toggleWatch(from, to, date, brand, btn) {
+  const idx = watches.findIndex(w => w.from === from && w.to === to && w.date === date);
+  if (idx >= 0) {
+    watches.splice(idx, 1);
+    btn.className = 'btn-watch';
+    btn.textContent = "+ Kuzatuvga qo'shish";
+  } else {
+    watches.push({ from, to, date, brand, added: new Date().toISOString() });
+    btn.className = 'btn-watch active';
+    btn.textContent = '✓ Kuzatilmoqda';
+    if (tg) tg.showAlert('Kuzatuvga qo\'shildi! Har 5 daqiqada tekshirib turaman.');
+  }
+  saveWatches();
+  if (tg) {
+    tg.sendData(JSON.stringify({ action: 'watch', from, to, date }));
+  }
+}
+
+function renderWatches() {
+  const list = document.getElementById('wlist');
+  if (!watches.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-ico">🔔</div><div class="empty-txt">Kuzatuvlar yo\'q</div><div class="empty-sub">Qidirish orqali reys qo\'shing</div></div>';
+    return;
+  }
+  list.innerHTML = watches.map((w, i) => `
+    <div class="watch-item">
+      <div class="watch-info">
+        <div class="watch-route">${stName(w.from)} → ${stName(w.to)}</div>
+        <div class="watch-sub">${w.brand || 'Barcha'} | ${w.date}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="watch-badge">Kuzatilmoqda</span>
+        <button class="btn-del" onclick="delWatch(${i})">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function delWatch(i) {
+  watches.splice(i, 1);
+  saveWatches();
+  renderWatches();
+}
+
+init();
+</script>
+</body>
+</html>
