@@ -3,15 +3,15 @@ import aiohttp
 import logging
 import sqlite3
 from datetime import datetime, timedelta
-from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram import executor
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
 import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
 COOKIE = os.getenv("RAILWAY_COOKIE", "")
 XSRF_TOKEN = os.getenv("XSRF_TOKEN", "")
 CHECK_INTERVAL = 300
@@ -22,7 +22,7 @@ STATIONS = {
     "Buxoro": "2900600",
     "Namangan": "2908600",
     "Andijon": "2900200",
-    "Farg'ona": "2905000",
+    "Fargona": "2905000",
     "Qarshi": "2904100",
     "Termiz": "2907500",
     "Urganch": "2909000",
@@ -61,24 +61,22 @@ async def check_trains(from_code, to_code, date):
         "Device-Type": "BROWSER",
         "Origin": "https://eticket.railway.uz",
         "Referer": "https://eticket.railway.uz/uz/home",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36",
     }
     payload = {"directions": {"forward": {"date": date, "depStationCode": from_code, "arvStationCode": to_code}}}
     try:
         connector = aiohttp.TCPConnector(ssl=False)
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as r:
-                logging.info(f"API javob: {r.status}")
-                text = await r.text()
-                logging.info(f"API text: {text[:200]}")
+                logging.info(f"API status: {r.status}")
                 if r.status == 200:
                     return await r.json(content_type=None)
                 else:
-                    logging.error(f"API xato status: {r.status}, body: {text[:500]}")
-                    return None
+                    text = await r.text()
+                    logging.error(f"API xato: {r.status} - {text[:200]}")
     except Exception as e:
-        logging.error(f"API ulanish xatosi: {type(e).__name__}: {e}")
-        return None
+        logging.error(f"Ulanish xato: {type(e).__name__}: {e}")
+    return None
 
 def parse_trains(data):
     trains = []
@@ -87,14 +85,19 @@ def parse_trains(data):
             cars = train.get("cars", [])
             total = sum(c.get("freeSeats", 0) for c in cars)
             car_info = [f"{c['type']}: {c['freeSeats']} joy" for c in cars if c.get("freeSeats", 0) > 0]
-            trains.append({"name": train.get("brand", "?"), "dep": train.get("departureDate", ""),
-                           "arr": train.get("arrivalDate", ""), "total": total, "cars": car_info})
+            trains.append({
+                "name": train.get("brand", "?"),
+                "dep": train.get("departureDate", ""),
+                "arr": train.get("arrivalDate", ""),
+                "total": total,
+                "cars": car_info
+            })
     except Exception as e:
         logging.error(f"Parse xato: {e}")
     return trains
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot, storage=MemoryStorage())
+dp = Dispatcher(storage=MemoryStorage())
 
 class Form(StatesGroup):
     from_st = State()
@@ -102,63 +105,74 @@ class Form(StatesGroup):
     date = State()
 
 def st_kb(exclude=None):
-    kb = InlineKeyboardMarkup(row_width=2)
+    buttons = []
+    row = []
     for name in STATIONS:
         if name != exclude:
-            kb.insert(InlineKeyboardButton(name, callback_data=f"st|{name}"))
-    return kb
+            row.append(InlineKeyboardButton(text=name, callback_data=f"st|{name}"))
+            if len(row) == 2:
+                buttons.append(row)
+                row = []
+    if row:
+        buttons.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-@dp.message_handler(commands=["start"])
+@dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
-    db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)", (msg.from_user.id, msg.from_user.username))
+    db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)",
+       (msg.from_user.id, msg.from_user.username))
     await msg.answer(
         "🚂 *Temir Yo'l Bilet Kuzatuvchi*\n\n"
         "Bot poyezd biletlarini kuzatadi!\n\n"
         "• 1 ta reys — *bepul*\n"
         "• 3+ reys — 50⭐ Stars / 3 kun\n\n"
-        "/kuzat — yangi reys\n/mening — kuzatuvlarim",
+        "/kuzat — yangi reys\n"
+        "/mening — kuzatuvlarim\n"
+        "/test — ulanishni tekshirish",
         parse_mode="Markdown")
 
-@dp.message_handler(commands=["test"])
+@dp.message(Command("test"))
 async def cmd_test(msg: types.Message):
-    """Cookie va ulanishni tekshirish"""
-    await msg.answer("🔍 Ulanish tekshirilmoqda...")
+    await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains("2900000", "2900700", "2026-04-27")
     if result:
-        await msg.answer(f"✅ Ulanish ishlayapti!\nJavob: {str(result)[:200]}")
+        trains = parse_trains(result)
+        await msg.answer(f"✅ Ishlayapti! {len(trains)} ta poyezd topildi.")
     else:
         await msg.answer(
-            "❌ Ulanishda xato!\n\n"
-            f"Cookie uzunligi: {len(COOKIE)} belgi\n"
-            f"XSRF token: {XSRF_TOKEN[:20]}...\n\n"
-            "Deploy Logs da batafsil xatoni ko'ring."
-        )
+            f"❌ Xato!\nCookie: {len(COOKIE)} belgi\nXSRF: {XSRF_TOKEN[:15]}...")
 
-@dp.message_handler(commands=["kuzat"])
-async def cmd_watch(msg: types.Message):
+@dp.message(Command("kuzat"))
+async def cmd_watch(msg: types.Message, state: FSMContext):
     user_id = msg.from_user.id
     users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?", (user_id,), fetch=True)
     is_premium = False
     if users and users[0][0]:
         if users[0][1] and datetime.fromisoformat(users[0][1]) > datetime.now():
             is_premium = True
-    count = db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1", (user_id,), fetch=True)[0][0]
+    count = db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1",
+               (user_id,), fetch=True)[0][0]
     if count >= 1 and not is_premium:
-        kb = InlineKeyboardMarkup()
-        kb.add(InlineKeyboardButton("⭐ 50 Stars — 3 kunlik obuna", callback_data="buy_premium"))
-        await msg.answer(f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz. Bepul limit: 1 ta", parse_mode="Markdown", reply_markup=kb)
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna", callback_data="buy_premium")
+        ]])
+        await msg.answer(
+            f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz.\nBepul limit: 1 ta",
+            parse_mode="Markdown", reply_markup=kb)
         return
     await msg.answer("🚉 *Qayerdan?*", parse_mode="Markdown", reply_markup=st_kb())
-    await Form.from_st.set()
+    await state.set_state(Form.from_st)
 
-@dp.callback_query_handler(lambda c: c.data.startswith("st|"), state=Form.from_st)
+@dp.callback_query(F.data.startswith("st|"), Form.from_st)
 async def got_from(cb: types.CallbackQuery, state: FSMContext):
     st = cb.data.split("|")[1]
     await state.update_data(from_st=st, from_code=STATIONS[st])
-    await cb.message.edit_text(f"✅ Qayerdan: *{st}*\n\n🚉 *Qayerga?*", parse_mode="Markdown", reply_markup=st_kb(exclude=st))
-    await Form.to_st.set()
+    await cb.message.edit_text(
+        f"✅ Qayerdan: *{st}*\n\n🚉 *Qayerga?*",
+        parse_mode="Markdown", reply_markup=st_kb(exclude=st))
+    await state.set_state(Form.to_st)
 
-@dp.callback_query_handler(lambda c: c.data.startswith("st|"), state=Form.to_st)
+@dp.callback_query(F.data.startswith("st|"), Form.to_st)
 async def got_to(cb: types.CallbackQuery, state: FSMContext):
     st = cb.data.split("|")[1]
     data = await state.get_data()
@@ -166,9 +180,9 @@ async def got_to(cb: types.CallbackQuery, state: FSMContext):
     await cb.message.edit_text(
         f"✅ Qayerdan: *{data['from_st']}*\n✅ Qayerga: *{st}*\n\n📅 *Sanani yuboring* (masalan: 2026-04-25)",
         parse_mode="Markdown")
-    await Form.date.set()
+    await state.set_state(Form.date)
 
-@dp.message_handler(state=Form.date)
+@dp.message(Form.date)
 async def got_date(msg: types.Message, state: FSMContext):
     date = msg.text.strip()
     try:
@@ -177,74 +191,84 @@ async def got_date(msg: types.Message, state: FSMContext):
         await msg.answer("❌ Format noto'g'ri! Masalan: *2026-04-25*", parse_mode="Markdown")
         return
     data = await state.get_data()
-    await state.finish()
+    await state.clear()
     await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains(data["from_code"], data["to_code"], date)
-    if not result:
-        await msg.answer(
-            "❌ Saytga ulanishda xato!\n\n"
-            "Sabab: Railway serveri eticket.railway.uz ga kira olmayapti.\n"
-            "Bu geo-bloklash muammosi bo'lishi mumkin.\n\n"
-            "Kuzatuv baribir saqlanmoqda — keyinroq sinab ko'radi."
-        )
     db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
        (msg.from_user.id, data["from_st"], data["to_st"], data["from_code"], data["to_code"], date))
-    if result:
-        trains = parse_trains(result)
-        text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
-        if trains:
-            for t in trains:
-                if t["total"] > 0:
-                    text += f"✅ *{t['name']}* — {t['total']} joy\n🕐 {t['dep']} → {t['arr']}\n"
-                    for c in t["cars"]: text += f"   • {c}\n"
-                    text += "\n"
-                else:
-                    text += f"❌ *{t['name']}* — joy yo'q ({t['dep']})\n"
-        else:
-            text += "Hozircha poyezd yo'q.\n"
-        text += f"\n🔔 Har {CHECK_INTERVAL//60} daqiqada tekshiraman!"
-        await msg.answer(text, parse_mode="Markdown")
+    if not result:
+        await msg.answer(
+            "⚠️ Hozir ma'lumot olinmadi, lekin kuzatuv saqlandi.\n"
+            f"🔔 Har {CHECK_INTERVAL//60} daqiqada tekshirib turaman!")
+        return
+    trains = parse_trains(result)
+    text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
+    if trains:
+        for t in trains:
+            if t["total"] > 0:
+                text += f"✅ *{t['name']}* — {t['total']} joy\n🕐 {t['dep']} → {t['arr']}\n"
+                for c in t["cars"]:
+                    text += f"   • {c}\n"
+                text += "\n"
+            else:
+                text += f"❌ *{t['name']}* — joy yo'q ({t['dep']})\n"
+    else:
+        text += "Hozircha poyezd yo'q.\n"
+    text += f"\n🔔 Har {CHECK_INTERVAL//60} daqiqada tekshiraman!"
+    await msg.answer(text, parse_mode="Markdown")
 
-@dp.message_handler(commands=["mening"])
+@dp.message(Command("mening"))
 async def cmd_my(msg: types.Message):
-    subs = db("SELECT id,from_st,to_st,date FROM subscriptions WHERE user_id=? AND is_active=1", (msg.from_user.id,), fetch=True)
+    subs = db("SELECT id,from_st,to_st,date FROM subscriptions WHERE user_id=? AND is_active=1",
+              (msg.from_user.id,), fetch=True)
     if not subs:
         await msg.answer("📭 Kuzatuvlar yo'q. /kuzat bilan boshlang!")
         return
     text = "📋 *Mening kuzatuvlarim:*\n\n"
-    kb = InlineKeyboardMarkup()
+    buttons = []
     for s in subs:
         text += f"🚂 {s[1]} → {s[2]} | {s[3]}\n"
-        kb.add(InlineKeyboardButton(f"❌ {s[1]}→{s[2]} ({s[3]})", callback_data=f"del|{s[0]}"))
-    await msg.answer(text, parse_mode="Markdown", reply_markup=kb)
+        buttons.append([InlineKeyboardButton(
+            text=f"❌ {s[1]}→{s[2]} ({s[3]})", callback_data=f"del|{s[0]}")])
+    await msg.answer(text, parse_mode="Markdown",
+                     reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
 
-@dp.callback_query_handler(lambda c: c.data.startswith("del|"))
+@dp.callback_query(F.data.startswith("del|"))
 async def del_sub(cb: types.CallbackQuery):
     db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(cb.data.split("|")[1]),))
     await cb.answer("✅ O'chirildi!")
     await cb.message.edit_text("✅ Kuzatuv o'chirildi.")
 
-@dp.callback_query_handler(lambda c: c.data == "buy_premium")
+@dp.callback_query(F.data == "buy_premium")
 async def buy(cb: types.CallbackQuery):
-    await bot.send_invoice(cb.from_user.id, title="⭐ 3 Kunlik Premium",
-        description="3+ reys kuzatish. 3 kunlik muddat.", payload="premium_3days",
-        currency="XTR", prices=[types.LabeledPrice("3 kunlik", 50)], provider_token="")
+    await bot.send_invoice(
+        chat_id=cb.from_user.id,
+        title="⭐ 3 Kunlik Premium",
+        description="3+ reys kuzatish imkoniyati. 3 kunlik muddat.",
+        payload="premium_3days",
+        currency="XTR",
+        prices=[LabeledPrice(label="3 kunlik", amount=50)],
+    )
 
-@dp.pre_checkout_query_handler()
+@dp.pre_checkout_query()
 async def pre_checkout(pcq: types.PreCheckoutQuery):
-    await bot.answer_pre_checkout_query(pcq.id, ok=True)
+    await pcq.answer(ok=True)
 
-@dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
+@dp.message(F.successful_payment)
 async def paid(msg: types.Message):
     until = (datetime.now() + timedelta(days=3)).isoformat()
-    db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?", (until, msg.from_user.id))
-    await msg.answer("🎉 *Premium faollashtirildi!* 3 kun davomida cheksiz kuzatuv.", parse_mode="Markdown")
+    db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?",
+       (until, msg.from_user.id))
+    await msg.answer("🎉 *Premium faollashtirildi!* 3 kun davomida cheksiz kuzatuv.",
+                     parse_mode="Markdown")
 
 async def checker():
     await asyncio.sleep(60)
     while True:
         try:
-            subs = db("SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1", fetch=True)
+            subs = db(
+                "SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1",
+                fetch=True)
             for sub in (subs or []):
                 sid, uid, from_st, to_st, from_code, to_code, date = sub
                 if date < datetime.now().strftime("%Y-%m-%d"):
@@ -261,17 +285,18 @@ async def checker():
                     text += "\n👉 https://eticket.railway.uz"
                     try:
                         await bot.send_message(uid, text, parse_mode="Markdown")
-                    except:
-                        pass
+                    except Exception as e:
+                        logging.error(f"Xabar xato: {e}")
         except Exception as e:
             logging.error(f"Checker xato: {e}")
         await asyncio.sleep(CHECK_INTERVAL)
 
-async def on_startup(dp):
+async def main():
     init_db()
     asyncio.create_task(checker())
     logging.info("Bot ishga tushdi!")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
+    asyncio.run(main())
