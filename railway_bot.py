@@ -20,14 +20,16 @@ CHECK_INTERVAL = 300
 STATIONS = {
     "Toshkent": "2900000",
     "Samarqand": "2900700",
-    "Buxoro": "2900600",
-    "Namangan": "2908600",
-    "Andijon": "2900200",
-    "Fargona": "2905000",
-    "Qarshi": "2904100",
-    "Termiz": "2907500",
-    "Urganch": "2909000",
-    "Nukus": "2903400",
+    "Buxoro": "2900800",
+    "Namangan": "2900940",
+    "Andijon": "2900680",
+    "Qoqon": "2900880",
+    "Qarshi": "2900750",
+    "Termiz": "2900255",
+    "Xiva": "2900172",
+    "Urgench": "2900790",
+    "Jizzax": "2900720",
+    "Nukus": "2900970",
 }
 
 async def check_trains(from_code, to_code, date):
