@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 import logging
 import sqlite3
+import os
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -9,11 +10,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
-import os
+from aiohttp_socks import ProxyConnector
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
 COOKIE = os.getenv("RAILWAY_COOKIE", "")
 XSRF_TOKEN = os.getenv("XSRF_TOKEN", "")
+PROXY = os.getenv("PROXY_URL", "")  # masalan: socks5://user:pass@host:port
 CHECK_INTERVAL = 300
 
 STATIONS = {
@@ -51,6 +53,11 @@ def db(query, params=(), fetch=False):
     conn.close()
     return result
 
+def get_connector():
+    if PROXY:
+        return ProxyConnector.from_url(PROXY, ssl=False)
+    return aiohttp.TCPConnector(ssl=False)
+
 async def check_trains(from_code, to_code, date):
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
     headers = {
@@ -63,11 +70,13 @@ async def check_trains(from_code, to_code, date):
         "Referer": "https://eticket.railway.uz/uz/home",
         "User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36",
     }
-    payload = {"directions": {"forward": {"date": date, "depStationCode": from_code, "arvStationCode": to_code}}}
+    payload = {"directions": {"forward": {
+        "date": date, "depStationCode": from_code, "arvStationCode": to_code
+    }}}
     try:
-        connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as r:
+        async with aiohttp.ClientSession(connector=get_connector()) as session:
+            async with session.post(url, json=payload, headers=headers,
+                                    timeout=aiohttp.ClientTimeout(total=30)) as r:
                 logging.info(f"API status: {r.status}")
                 if r.status == 200:
                     return await r.json(content_type=None)
@@ -84,19 +93,24 @@ def parse_trains(data):
         for train in data.get("directions", {}).get("forward", []):
             cars = train.get("cars", [])
             total = sum(c.get("freeSeats", 0) for c in cars)
-            car_info = [f"{c['type']}: {c['freeSeats']} joy" for c in cars if c.get("freeSeats", 0) > 0]
+            car_info = [f"{c['type']}: {c['freeSeats']} joy"
+                        for c in cars if c.get("freeSeats", 0) > 0]
             trains.append({
                 "name": train.get("brand", "?"),
                 "dep": train.get("departureDate", ""),
                 "arr": train.get("arrivalDate", ""),
-                "total": total,
-                "cars": car_info
+                "total": total, "cars": car_info
             })
     except Exception as e:
         logging.error(f"Parse xato: {e}")
     return trains
 
-bot = Bot(token=BOT_TOKEN)
+# Bot proxy bilan
+if PROXY:
+    bot = Bot(token=BOT_TOKEN, proxy=PROXY)
+else:
+    bot = Bot(token=BOT_TOKEN)
+
 dp = Dispatcher(storage=MemoryStorage())
 
 class Form(StatesGroup):
@@ -140,12 +154,15 @@ async def cmd_test(msg: types.Message):
         await msg.answer(f"✅ Ishlayapti! {len(trains)} ta poyezd topildi.")
     else:
         await msg.answer(
-            f"❌ Xato!\nCookie: {len(COOKIE)} belgi\nXSRF: {XSRF_TOKEN[:15]}...")
+            f"❌ Xato!\n"
+            f"Cookie: {len(COOKIE)} belgi\n"
+            f"Proxy: {PROXY or 'Yo\'q'}")
 
 @dp.message(Command("kuzat"))
 async def cmd_watch(msg: types.Message, state: FSMContext):
     user_id = msg.from_user.id
-    users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?", (user_id,), fetch=True)
+    users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?",
+               (user_id,), fetch=True)
     is_premium = False
     if users and users[0][0]:
         if users[0][1] and datetime.fromisoformat(users[0][1]) > datetime.now():
@@ -154,7 +171,8 @@ async def cmd_watch(msg: types.Message, state: FSMContext):
                (user_id,), fetch=True)[0][0]
     if count >= 1 and not is_premium:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna", callback_data="buy_premium")
+            InlineKeyboardButton(text="⭐ 50 Stars — 3 kunlik obuna",
+                                 callback_data="buy_premium")
         ]])
         await msg.answer(
             f"⭐ *Premium kerak!*\n\n{count} ta reys kuzatyapsiz.\nBepul limit: 1 ta",
@@ -178,7 +196,8 @@ async def got_to(cb: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.update_data(to_st=st, to_code=STATIONS[st])
     await cb.message.edit_text(
-        f"✅ Qayerdan: *{data['from_st']}*\n✅ Qayerga: *{st}*\n\n📅 *Sanani yuboring* (masalan: 2026-04-25)",
+        f"✅ Qayerdan: *{data['from_st']}*\n✅ Qayerga: *{st}*\n\n"
+        f"📅 *Sanani yuboring* (masalan: 2026-04-25)",
         parse_mode="Markdown")
     await state.set_state(Form.date)
 
@@ -195,7 +214,8 @@ async def got_date(msg: types.Message, state: FSMContext):
     await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains(data["from_code"], data["to_code"], date)
     db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
-       (msg.from_user.id, data["from_st"], data["to_st"], data["from_code"], data["to_code"], date))
+       (msg.from_user.id, data["from_st"], data["to_st"],
+        data["from_code"], data["to_code"], date))
     if not result:
         await msg.answer(
             "⚠️ Hozir ma'lumot olinmadi, lekin kuzatuv saqlandi.\n"
@@ -244,7 +264,7 @@ async def buy(cb: types.CallbackQuery):
     await bot.send_invoice(
         chat_id=cb.from_user.id,
         title="⭐ 3 Kunlik Premium",
-        description="3+ reys kuzatish imkoniyati. 3 kunlik muddat.",
+        description="3+ reys kuzatish. 3 kunlik muddat.",
         payload="premium_3days",
         currency="XTR",
         prices=[LabeledPrice(label="3 kunlik", amount=50)],
@@ -259,16 +279,15 @@ async def paid(msg: types.Message):
     until = (datetime.now() + timedelta(days=3)).isoformat()
     db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?",
        (until, msg.from_user.id))
-    await msg.answer("🎉 *Premium faollashtirildi!* 3 kun davomida cheksiz kuzatuv.",
-                     parse_mode="Markdown")
+    await msg.answer("🎉 *Premium faollashtirildi!*", parse_mode="Markdown")
 
 async def checker():
     await asyncio.sleep(60)
     while True:
         try:
             subs = db(
-                "SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1",
-                fetch=True)
+                "SELECT id,user_id,from_st,to_st,from_code,to_code,date "
+                "FROM subscriptions WHERE is_active=1", fetch=True)
             for sub in (subs or []):
                 sid, uid, from_st, to_st, from_code, to_code, date = sub
                 if date < datetime.now().strftime("%Y-%m-%d"):
