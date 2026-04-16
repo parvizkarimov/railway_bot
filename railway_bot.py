@@ -14,8 +14,40 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPri
 import json
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
-ENV_COOKIE = os.getenv("RAILWAY_COOKIE", "")
-ENV_XSRF = os.getenv("XSRF_TOKEN", "")
+# Cookie cache
+_cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
+
+async def refresh_cookie():
+    """Playwright orqali yangi cookie olish"""
+    try:
+        from playwright.async_api import async_playwright
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            )
+            page = await context.new_page()
+            await page.goto("https://eticket.railway.uz/uz/home", wait_until="networkidle", timeout=30000)
+            cookies = await context.cookies()
+            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
+            xsrf = next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), "")
+            await browser.close()
+            if cookie_str and xsrf:
+                _cookie_cache["cookie"] = cookie_str
+                _cookie_cache["xsrf"] = xsrf
+                _cookie_cache["updated"] = datetime.now()
+                logging.info(f"Cookie yangilandi: {len(cookie_str)} belgi, XSRF: {xsrf[:20]}")
+                return True
+    except Exception as e:
+        logging.error(f"Playwright xato: {e}")
+    return False
+
+async def get_cookie():
+    """Cookie olish — eskirgan bo'lsa yangilash"""
+    updated = _cookie_cache.get("updated")
+    if not updated or (datetime.now() - updated).seconds > 1800 or not _cookie_cache["cookie"]:
+        await refresh_cookie()
+    return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 CHECK_INTERVAL = 300
 PORT = int(os.getenv("PORT", 8000))
@@ -37,11 +69,12 @@ STATIONS = {
 
 async def check_trains(from_code, to_code, date):
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
+    cookie, xsrf = await get_cookie()
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "Cookie": ENV_COOKIE,
-        "X-Xsrf-Token": ENV_XSRF,
+        "Cookie": cookie,
+        "X-Xsrf-Token": xsrf,
         "Device-Type": "BROWSER",
         "Origin": "https://eticket.railway.uz",
         "Referer": "https://eticket.railway.uz/uz/home",
@@ -149,10 +182,11 @@ async def cmd_start(msg: types.Message):
 
 @dp.message(Command("test"))
 async def cmd_test(msg: types.Message):
+    await msg.answer("🔍 Cookie olinmoqda...")
+    cookie, xsrf = await get_cookie()
     await msg.answer(
-        f"🔍 Tekshirilmoqda...\n"
-        f"Cookie: {len(ENV_COOKIE)} belgi\n"
-        f"XSRF: {ENV_XSRF[:20] if ENV_XSRF else 'Yoq'}"
+        f"Cookie: {len(cookie)} belgi\n"
+        f"XSRF: {xsrf[:20] if xsrf else 'Yoq'}"
     )
     result = await check_trains("2900000", "2900700", "2026-04-30")
     if result:
@@ -359,10 +393,18 @@ async def start_webserver():
     await site.start()
     logging.info(f"Web server port {PORT} da ishga tushdi!")
 
+async def cookie_refresher():
+    """Har 30 daqiqada cookie yangilash"""
+    while True:
+        await refresh_cookie()
+        await asyncio.sleep(1800)
+
 async def main():
     init_db()
     await start_webserver()
+    await refresh_cookie()
     asyncio.create_task(checker())
+    asyncio.create_task(cookie_refresher())
     logging.info("Bot ishga tushdi!")
     await dp.start_polling(bot)
 
