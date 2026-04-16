@@ -190,8 +190,8 @@ async def cmd_test(msg: types.Message):
     if result:
         trains = parse_trains(result)
         await msg.answer(f"✅ Hammasi ishlayapti!\n🍪 Cookie: {len(cookie)} belgi\n🚂 Poyezdlar: {len(trains)} ta")
-    else:
-        await msg.answer(f"❌ Xato!\n🍪 Cookie: {len(cookie)} belgi\n🔑 XSRF: {xsrf[:20] if xsrf else 'Yo\'q'}")
+xsrf_info = xsrf[:20] if xsrf else "Yo'q"
+        await msg.answer(f"❌ Xato!\n🍪 Cookie: {len(cookie)} belgi\n🔑 XSRF: {xsrf_info}")
 
 @dp.message(Command("kuzat"))
 async def cmd_watch(msg: types.Message, state: FSMContext):
