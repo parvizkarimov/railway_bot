@@ -1,8 +1,3 @@
-"""
-O'zbekiston Temir Yo'llari - Bilet Kuzatuvchi Bot
-aiogram 2.x versiyasi
-"""
-
 import asyncio
 import aiohttp
 import logging
@@ -17,8 +12,8 @@ from aiogram import executor
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-COOKIE = os.getenv("RAILWAY_COOKIE", "__stripe_mid=f43f7783-226c-4ff7-9510-625484dac49e0d4cf0; XSRF-TOKEN=d89afd60-e961-4304-8cf2-d7318b56a71d")
-XSRF_TOKEN = os.getenv("XSRF_TOKEN", "d89afd60-e961-4304-8cf2-d7318b56a71d")
+COOKIE = os.getenv("RAILWAY_COOKIE", "")
+XSRF_TOKEN = os.getenv("XSRF_TOKEN", "")
 CHECK_INTERVAL = 300
 
 STATIONS = {
@@ -65,17 +60,25 @@ async def check_trains(from_code, to_code, date):
         "X-Xsrf-Token": XSRF_TOKEN,
         "Device-Type": "BROWSER",
         "Origin": "https://eticket.railway.uz",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0) AppleWebKit/537.36 Chrome/147.0.0.0 Mobile Safari/537.36",
+        "Referer": "https://eticket.railway.uz/uz/home",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36",
     }
     payload = {"directions": {"forward": {"date": date, "depStationCode": from_code, "arvStationCode": to_code}}}
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as r:
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as r:
+                logging.info(f"API javob: {r.status}")
+                text = await r.text()
+                logging.info(f"API text: {text[:200]}")
                 if r.status == 200:
-                    return await r.json()
+                    return await r.json(content_type=None)
+                else:
+                    logging.error(f"API xato status: {r.status}, body: {text[:500]}")
+                    return None
     except Exception as e:
-        logging.error(f"API xato: {e}")
-    return None
+        logging.error(f"API ulanish xatosi: {type(e).__name__}: {e}")
+        return None
 
 def parse_trains(data):
     trains = []
@@ -115,6 +118,21 @@ async def cmd_start(msg: types.Message):
         "• 3+ reys — 50⭐ Stars / 3 kun\n\n"
         "/kuzat — yangi reys\n/mening — kuzatuvlarim",
         parse_mode="Markdown")
+
+@dp.message_handler(commands=["test"])
+async def cmd_test(msg: types.Message):
+    """Cookie va ulanishni tekshirish"""
+    await msg.answer("🔍 Ulanish tekshirilmoqda...")
+    result = await check_trains("2900000", "2900700", "2026-04-27")
+    if result:
+        await msg.answer(f"✅ Ulanish ishlayapti!\nJavob: {str(result)[:200]}")
+    else:
+        await msg.answer(
+            "❌ Ulanishda xato!\n\n"
+            f"Cookie uzunligi: {len(COOKIE)} belgi\n"
+            f"XSRF token: {XSRF_TOKEN[:20]}...\n\n"
+            "Deploy Logs da batafsil xatoni ko'ring."
+        )
 
 @dp.message_handler(commands=["kuzat"])
 async def cmd_watch(msg: types.Message):
@@ -163,24 +181,29 @@ async def got_date(msg: types.Message, state: FSMContext):
     await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains(data["from_code"], data["to_code"], date)
     if not result:
-        await msg.answer("❌ Saytga ulanishda xato. Cookie yangilanishi kerak.")
-        return
+        await msg.answer(
+            "❌ Saytga ulanishda xato!\n\n"
+            "Sabab: Railway serveri eticket.railway.uz ga kira olmayapti.\n"
+            "Bu geo-bloklash muammosi bo'lishi mumkin.\n\n"
+            "Kuzatuv baribir saqlanmoqda — keyinroq sinab ko'radi."
+        )
     db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
        (msg.from_user.id, data["from_st"], data["to_st"], data["from_code"], data["to_code"], date))
-    trains = parse_trains(result)
-    text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
-    if trains:
-        for t in trains:
-            if t["total"] > 0:
-                text += f"✅ *{t['name']}* — {t['total']} joy\n🕐 {t['dep']} → {t['arr']}\n"
-                for c in t["cars"]: text += f"   • {c}\n"
-                text += "\n"
-            else:
-                text += f"❌ *{t['name']}* — joy yo'q ({t['dep']})\n"
-    else:
-        text += "Hozircha poyezd yo'q.\n"
-    text += f"\n🔔 Har {CHECK_INTERVAL//60} daqiqada tekshiraman!"
-    await msg.answer(text, parse_mode="Markdown")
+    if result:
+        trains = parse_trains(result)
+        text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
+        if trains:
+            for t in trains:
+                if t["total"] > 0:
+                    text += f"✅ *{t['name']}* — {t['total']} joy\n🕐 {t['dep']} → {t['arr']}\n"
+                    for c in t["cars"]: text += f"   • {c}\n"
+                    text += "\n"
+                else:
+                    text += f"❌ *{t['name']}* — joy yo'q ({t['dep']})\n"
+        else:
+            text += "Hozircha poyezd yo'q.\n"
+        text += f"\n🔔 Har {CHECK_INTERVAL//60} daqiqada tekshiraman!"
+        await msg.answer(text, parse_mode="Markdown")
 
 @dp.message_handler(commands=["mening"])
 async def cmd_my(msg: types.Message):
@@ -218,7 +241,7 @@ async def paid(msg: types.Message):
     await msg.answer("🎉 *Premium faollashtirildi!* 3 kun davomida cheksiz kuzatuv.", parse_mode="Markdown")
 
 async def checker():
-    await asyncio.sleep(30)
+    await asyncio.sleep(60)
     while True:
         try:
             subs = db("SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1", fetch=True)
@@ -228,15 +251,18 @@ async def checker():
                     db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sid,))
                     continue
                 result = await check_trains(from_code, to_code, date)
-                if not result: continue
+                if not result:
+                    continue
                 available = [t for t in parse_trains(result) if t["total"] > 0]
                 if available:
                     text = f"🔔 *Bo'sh joy topildi!*\n🚂 *{from_st} → {to_st}* ({date})\n\n"
                     for t in available:
                         text += f"✅ *{t['name']}* — {t['total']} joy\n🕐 {t['dep']} → {t['arr']}\n"
                     text += "\n👉 https://eticket.railway.uz"
-                    try: await bot.send_message(uid, text, parse_mode="Markdown")
-                    except: pass
+                    try:
+                        await bot.send_message(uid, text, parse_mode="Markdown")
+                    except:
+                        pass
         except Exception as e:
             logging.error(f"Checker xato: {e}")
         await asyncio.sleep(CHECK_INTERVAL)
@@ -244,6 +270,8 @@ async def checker():
 async def on_startup(dp):
     init_db()
     asyncio.create_task(checker())
+    logging.info("Bot ishga tushdi!")
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
