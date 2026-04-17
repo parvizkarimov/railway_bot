@@ -235,8 +235,19 @@ async def pre_checkout_handler(query: types.PreCheckoutQuery):
 @dp.message(F.successful_payment)
 async def success_payment_handler(msg: types.Message):
     count = int(msg.successful_payment.invoice_payload.split("_")[1])
+    amount = msg.successful_payment.total_amount
     await db("UPDATE users SET coins = coins + ? WHERE user_id = ?", (count, msg.from_user.id))
-    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta ⭐ qo'shildi. Endi bemalol yangi kuzatuvlar qo'shishingiz mumkin.")
+    
+    # Foydalanuvchiga xabar
+    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta ⭐ qo'shildi.")
+    
+    # Adminga xabar
+    admin_msg = (f"💰 *Yangi to'lov!*\n\n"
+                 f"👤 Kimdan: {msg.from_user.full_name} (@{msg.from_user.username})\n"
+                 f"🆔 ID: `{msg.from_user.id}`\n"
+                 f"⭐ Miqdori: {amount} yulduz\n"
+                 f"📦 Paket: {count} ta tanga")
+    await send_error_to_admin(admin_msg)
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
@@ -392,7 +403,10 @@ async def main():
     await start_webserver()
     await refresh_cookie()
     asyncio.create_task(checker())
-    asyncio.create_task(asyncio.sleep(1800)) # Cookie refresher o'rniga loop
+    
+    # Deploy xabari
+    await send_error_to_admin("🚀 *Bot serverda muvaffaqiyatli ishga tushdi!* (Deploy completed)")
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
