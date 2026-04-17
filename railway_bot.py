@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 import asyncio
 import aiohttp
 import logging
@@ -30,7 +31,7 @@ async def refresh_cookie():
             await page.goto("https://eticket.railway.uz/uz/home", wait_until="networkidle", timeout=30000)
             cookies = await context.cookies()
             cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
-            xsrf = next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), "")
+            xsrf = unquote(next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), ""))
             await browser.close()
             if cookie_str and xsrf:
                 _cookie_cache["cookie"] = cookie_str
