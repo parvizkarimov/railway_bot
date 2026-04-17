@@ -1,8 +1,9 @@
 from urllib.parse import unquote
 import asyncio
 import aiohttp
+import aiosqlite
 import logging
-import sqlite3
+import re
 import os
 from datetime import datetime, timedelta
 from aiohttp import web
@@ -17,6 +18,7 @@ import json
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
 # Cookie cache
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
+COOKIE_TTL = 1500  # 25 daqiqa (soniyalarda)
 
 async def refresh_cookie():
     """Playwright orqali yangi cookie olish"""
@@ -40,17 +42,23 @@ async def refresh_cookie():
                 _cookie_cache["cookie"] = cookie_str
                 _cookie_cache["xsrf"] = xsrf
                 _cookie_cache["updated"] = datetime.now()
-                logging.info(f"Cookie: {cookie_str[:100]}")
+                logging.info(f"Cookie yangilandi: {cookie_str[:100]}")
                 logging.info(f"XSRF full: {xsrf}")
                 return True
     except Exception as e:
         logging.error(f"Playwright xato: {e}")
     return False
 
-async def get_cookie():
-    """Har safar yangi cookie olish"""
+async def get_cookie(force=False):
+    """Keshlangan cookie qaytarish, muddati o'tgan bo'lsa yangilash"""
+    if (not force and _cookie_cache["cookie"] and _cookie_cache["updated"] and
+        (datetime.now() - _cookie_cache["updated"]).total_seconds() < COOKIE_TTL):
+        logging.debug("Cookie keshdan qaytarildi")
+        return _cookie_cache["cookie"], _cookie_cache["xsrf"]
+    logging.info("Cookie yangilanmoqda...")
     await refresh_cookie()
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
+
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHECK_INTERVAL = 300
@@ -71,7 +79,7 @@ STATIONS = {
     "Nukus": "2900970",
 }
 
-async def check_trains(from_code, to_code, date):
+async def check_trains(from_code, to_code, date, _retry=0):
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
     cookie, xsrf = await get_cookie()
     headers = {
@@ -102,9 +110,20 @@ async def check_trains(from_code, to_code, date):
                 logging.info(f"Cookie uzunligi: {len(headers['Cookie'])}, XSRF: {headers['X-Xsrf-Token']}")
                 if r.status == 200:
                     return await r.json(content_type=None)
+                elif r.status in (401, 419) and _retry < 3:
+                    logging.warning(f"Cookie eskirgan (status {r.status}), yangilanmoqda... (urinish {_retry + 1}/3)")
+                    await get_cookie(force=True)
+                    await asyncio.sleep(2 ** (_retry + 1))
+                    return await check_trains(from_code, to_code, date, _retry=_retry + 1)
                 else:
                     text = await r.text()
                     logging.error(f"API xato: {r.status} - {text[:300]}")
+    except aiohttp.ClientError as e:
+        if _retry < 3:
+            logging.warning(f"Tarmoq xatosi, qayta urinish... ({_retry + 1}/3): {e}")
+            await asyncio.sleep(2 ** (_retry + 1))
+            return await check_trains(from_code, to_code, date, _retry=_retry + 1)
+        logging.error(f"Request xato (3 urinishdan keyin): {e}")
     except Exception as e:
         logging.error(f"Request xato: {e}")
     return None
@@ -119,28 +138,62 @@ def parse_trains(data):
         logging.error(f"Parse xato: {e}")
     return trains
 
-def init_db():
-    conn = sqlite3.connect("bot.db")
-    c = conn.cursor()
-    c.execute("""CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY, username TEXT,
-        is_premium INTEGER DEFAULT 0, premium_until TEXT)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER, from_st TEXT, to_st TEXT,
-        from_code TEXT, to_code TEXT, date TEXT, is_active INTEGER DEFAULT 1)""")
-    conn.commit()
-    conn.close()
+def format_price(price):
+    """Narxni formatlash: 120000 -> '120 000 so'm'"""
+    if not price:
+        return ""
+    try:
+        return f" — {int(price):,} so'm".replace(",", " ")
+    except (ValueError, TypeError):
+        return ""
 
-def db(query, params=(), fetch=False):
-    conn = sqlite3.connect("bot.db")
-    c = conn.cursor()
-    c.execute(query, params)
-    result = c.fetchall() if fetch else None
-    conn.commit()
-    conn.close()
-    return result
+def get_car_price(car):
+    """Vagon narxini olish (turli API formatlarini qo'llab-quvvatlash)"""
+    price = car.get("price", 0)
+    if not price and isinstance(car.get("tariff"), dict):
+        price = car.get("tariff", {}).get("price", 0)
+    return price
 
+def format_train_details(trains):
+    """Poyezd ma'lumotlarini vagon turlari va narxlari bilan formatlash"""
+    text = ""
+    for t in trains:
+        cars = t.get("cars", [])
+        total = sum(c.get("freeSeats", 0) for c in cars)
+        if total > 0:
+            text += f"✅ *{t.get('brand', '?')}* — {total} joy\n"
+            for c in cars:
+                seats = c.get("freeSeats", 0)
+                if seats > 0:
+                    price = get_car_price(c)
+                    text += f"    {c.get('type', '?')}: {seats} joy{format_price(price)}\n"
+            text += f"🕐 {t.get('departureDate', '')} → {t.get('arrivalDate', '')}\n\n"
+        else:
+            text += f"❌ *{t.get('brand', '?')}* — joy yo'q\n"
+    return text
+
+# ---- Database (aiosqlite) ----
+DB_PATH = "bot.db"
+
+async def init_db():
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY, username TEXT,
+            is_premium INTEGER DEFAULT 0, premium_until TEXT)""")
+        await conn.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, from_st TEXT, to_st TEXT,
+            from_code TEXT, to_code TEXT, date TEXT, is_active INTEGER DEFAULT 1)""")
+        await conn.commit()
+
+async def db(query, params=(), fetch=False):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(query, params)
+        result = await cursor.fetchall() if fetch else None
+        await conn.commit()
+        return result
+
+# ---- Bot ----
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -164,9 +217,9 @@ def st_kb(exclude=None):
 
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
-    db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)",
+    await db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)",
        (msg.from_user.id, msg.from_user.username))
-    
+
     buttons = []
     if WEBAPP_URL:
         buttons.append([InlineKeyboardButton(
@@ -174,7 +227,7 @@ async def cmd_start(msg: types.Message):
             web_app=WebAppInfo(url=WEBAPP_URL)
         )])
     buttons.append([InlineKeyboardButton(text="📋 Kuzatuvlarim", callback_data="my_subs")])
-    
+
     await msg.answer(
         "🚂 *Temir Yo'l Bilet Kuzatuvchi*\n\n"
         "Bot poyezd biletlarini kuzatadi!\n\n"
@@ -204,10 +257,10 @@ async def cmd_test(msg: types.Message):
 @dp.message(Command("kuzat"))
 async def cmd_watch(msg: types.Message, state: FSMContext):
     user_id = msg.from_user.id
-    count = db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1",
-               (user_id,), fetch=True)[0][0]
-    
-    users = db("SELECT is_premium, premium_until FROM users WHERE user_id=?", (user_id,), fetch=True)
+    count = (await db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1",
+               (user_id,), fetch=True))[0][0]
+
+    users = await db("SELECT is_premium, premium_until FROM users WHERE user_id=?", (user_id,), fetch=True)
     is_premium = False
     if users and users[0][0]:
         if users[0][1] and datetime.fromisoformat(users[0][1]) > datetime.now():
@@ -233,7 +286,7 @@ async def cmd_my(msg: types.Message):
     await show_my_subs(msg, msg.from_user.id)
 
 async def show_my_subs(msg, user_id):
-    subs = db("SELECT id,from_st,to_st,date FROM subscriptions WHERE user_id=? AND is_active=1",
+    subs = await db("SELECT id,from_st,to_st,date FROM subscriptions WHERE user_id=? AND is_active=1",
               (user_id,), fetch=True)
     if not subs:
         await msg.answer("📭 Kuzatuvlar yo'q. /kuzat bilan boshlang!")
@@ -277,7 +330,7 @@ async def got_date(msg: types.Message, state: FSMContext):
     await state.clear()
     await msg.answer("🔍 Tekshirilmoqda...")
     result = await check_trains(data["from_code"], data["to_code"], date)
-    db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
+    await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
        (msg.from_user.id, data["from_st"], data["to_st"],
         data["from_code"], data["to_code"], date))
     if not result:
@@ -287,14 +340,7 @@ async def got_date(msg: types.Message, state: FSMContext):
     trains = parse_trains(result)
     text = f"🚂 *{data['from_st']} → {data['to_st']}* ({date})\n\n"
     if trains:
-        for t in trains:
-            cars = t.get("cars", [])
-            total = sum(c.get("freeSeats", 0) for c in cars)
-            if total > 0:
-                text += f"✅ *{t.get('brand','?')}* — {total} joy\n"
-                text += f"🕐 {t.get('departureDate','')} → {t.get('arrivalDate','')}\n\n"
-            else:
-                text += f"❌ *{t.get('brand','?')}* — joy yo'q\n"
+        text += format_train_details(trains)
     else:
         text += "Hozircha poyezd yo'q.\n"
     text += f"\n🔔 Har {CHECK_INTERVAL//60} daqiqada tekshiraman!"
@@ -302,7 +348,7 @@ async def got_date(msg: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("del|"))
 async def del_sub(cb: types.CallbackQuery):
-    db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(cb.data.split("|")[1]),))
+    await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(cb.data.split("|")[1]),))
     await cb.answer("✅ O'chirildi!")
     await cb.message.edit_text("✅ Kuzatuv o'chirildi.")
 
@@ -316,7 +362,7 @@ async def web_app_data(msg: types.Message):
             date = data["date"]
             from_name = next((k for k, v in STATIONS.items() if v == from_code), from_code)
             to_name = next((k for k, v in STATIONS.items() if v == to_code), to_code)
-            db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
+            await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
                (msg.from_user.id, from_name, to_name, from_code, to_code, date))
             await msg.answer(f"✅ Kuzatuvga qo'shildi!\n🚂 {from_name} → {to_name} | {date}\n🔔 Har 5 daqiqada tekshiraman!")
     except Exception as e:
@@ -337,7 +383,7 @@ async def pre_checkout(pcq: types.PreCheckoutQuery):
 @dp.message(F.successful_payment)
 async def paid(msg: types.Message):
     until = (datetime.now() + timedelta(days=3)).isoformat()
-    db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?", (until, msg.from_user.id))
+    await db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?", (until, msg.from_user.id))
     await msg.answer("🎉 *Premium faollashtirildi!*", parse_mode="Markdown")
 
 
@@ -351,11 +397,8 @@ async def cmd_setcookie(msg: types.Message):
         await msg.answer("Format: /setcookie COOKIE_QIYMAT")
         return
     cookie_text = parts[1].strip()
-    xsrf_match = None
-    import re
     m = re.search(r'XSRF-TOKEN=([^;]+)', cookie_text)
-    if m:
-        xsrf_match = unquote(m.group(1))
+    xsrf_match = unquote(m.group(1)) if m else None
     _cookie_cache["cookie"] = cookie_text
     _cookie_cache["xsrf"] = xsrf_match or ""
     _cookie_cache["updated"] = datetime.now()
@@ -365,11 +408,11 @@ async def checker():
     await asyncio.sleep(60)
     while True:
         try:
-            subs = db("SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1", fetch=True)
+            subs = await db("SELECT id,user_id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE is_active=1", fetch=True)
             for sub in (subs or []):
                 sid, uid, from_st, to_st, from_code, to_code, date = sub
                 if date < datetime.now().strftime("%Y-%m-%d"):
-                    db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sid,))
+                    await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sid,))
                     continue
                 result = await check_trains(from_code, to_code, date)
                 if not result:
@@ -378,9 +421,7 @@ async def checker():
                 available = [t for t in trains if sum(c.get("freeSeats", 0) for c in t.get("cars", [])) > 0]
                 if available:
                     text = f"🔔 *Bo'sh joy topildi!*\n🚂 *{from_st} → {to_st}* ({date})\n\n"
-                    for t in available:
-                        total = sum(c.get("freeSeats", 0) for c in t.get("cars", []))
-                        text += f"✅ *{t.get('brand','?')}* — {total} joy\n"
+                    text += format_train_details(available)
                     text += "\n👉 https://eticket.railway.uz"
                     try:
                         await bot.send_message(uid, text, parse_mode="Markdown")
@@ -390,7 +431,7 @@ async def checker():
             logging.error(f"Checker xato: {e}")
         await asyncio.sleep(CHECK_INTERVAL)
 
-# Web server for WebApp
+# ---- Web server for WebApp ----
 async def handle_webapp(request):
     with open("webapp.html", "r", encoding="utf-8") as f:
         content = f.read()
@@ -410,10 +451,60 @@ async def handle_trains_api(request):
     except Exception as e:
         return web.json_response({"trains": [], "error": str(e)})
 
+async def handle_get_subs(request):
+    """WebApp uchun kuzatuvlarni olish"""
+    try:
+        user_id = request.query.get("user_id")
+        if not user_id:
+            return web.json_response({"subs": [], "error": "user_id kerak"})
+        subs = await db(
+            "SELECT id,from_st,to_st,from_code,to_code,date FROM subscriptions WHERE user_id=? AND is_active=1",
+            (int(user_id),), fetch=True)
+        result = []
+        for s in (subs or []):
+            result.append({"id": s[0], "from_st": s[1], "to_st": s[2],
+                          "from_code": s[3], "to_code": s[4], "date": s[5]})
+        return web.json_response({"subs": result})
+    except Exception as e:
+        return web.json_response({"subs": [], "error": str(e)})
+
+async def handle_add_sub(request):
+    """WebApp orqali kuzatuv qo'shish"""
+    try:
+        body = await request.json()
+        user_id = body.get("user_id")
+        from_code = body.get("from")
+        to_code = body.get("to")
+        date = body.get("date")
+        if not all([user_id, from_code, to_code, date]):
+            return web.json_response({"ok": False, "error": "Barcha maydonlar kerak"})
+        from_name = next((k for k, v in STATIONS.items() if v == from_code), from_code)
+        to_name = next((k for k, v in STATIONS.items() if v == to_code), to_code)
+        await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date) VALUES (?,?,?,?,?,?)",
+           (int(user_id), from_name, to_name, from_code, to_code, date))
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
+async def handle_del_sub(request):
+    """WebApp orqali kuzatuvni o'chirish"""
+    try:
+        body = await request.json()
+        sub_id = body.get("id")
+        if not sub_id:
+            return web.json_response({"ok": False, "error": "id kerak"})
+        await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(sub_id),))
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
 async def start_webserver():
     app = web.Application()
     app.router.add_get("/", handle_webapp)
     app.router.add_post("/api/trains", handle_trains_api)
+    app.router.add_get("/api/subs", handle_get_subs)
+    app.router.add_post("/api/subs", handle_add_sub)
+    app.router.add_post("/api/subs/delete", handle_del_sub)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
@@ -427,7 +518,7 @@ async def cookie_refresher():
         await asyncio.sleep(1800)
 
 async def main():
-    init_db()
+    await init_db()
     await start_webserver()
     await refresh_cookie()
     asyncio.create_task(checker())

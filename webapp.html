@@ -49,8 +49,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; }
 .seat-tag.has { background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
 .seat-tag.nope { background: rgba(0,0,0,0.07); opacity: 0.6; }
+.seat-price { font-size: 11px; opacity: 0.7; margin-left: 4px; }
 .btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
 .btn-watch.active { background: rgba(46, 166, 255, 0.1); }
+
+/* Filter chips */
+.filter-row { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+.filter-chip { font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); background: transparent; color: var(--tg-theme-button-color, #2EA6FF); cursor: pointer; font-family: inherit; font-weight: 500; transition: all 0.2s; }
+.filter-chip.active { background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); }
 
 .watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 .watch-info { flex: 1; }
@@ -105,6 +111,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <button class="btn-primary" onclick="search()">Qidirish</button>
     </div>
+    <div id="filter-area"></div>
     <div id="results"></div>
   </div>
 
@@ -118,6 +125,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 const BOT_URL = window.location.origin;
+const USER_ID = tg?.initDataUnsafe?.user?.id || null;
 
 const STATIONS = {
   "Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800",
@@ -130,8 +138,37 @@ function stName(code) {
   return Object.keys(STATIONS).find(k => STATIONS[k] === code) || code;
 }
 
+function formatPrice(price) {
+  if (!price) return '';
+  return Number(price).toLocaleString('uz-UZ') + " so'm";
+}
+
+// Kuzatuvlar — serverdan sinxronlash
 let watches = [];
-try { watches = JSON.parse(localStorage.getItem('rw_watches') || '[]'); } catch(e) {}
+let activeFilters = new Set(); // Vagon turi filtrlari
+let lastTrains = []; // Oxirgi qidiruv natijalari
+let lastSearch = {}; // Oxirgi qidiruv parametrlari
+
+async function loadWatches() {
+  if (!USER_ID) {
+    try { watches = JSON.parse(localStorage.getItem('rw_watches') || '[]'); } catch(e) {}
+    updateCnt();
+    return;
+  }
+  try {
+    const r = await fetch(`${BOT_URL}/api/subs?user_id=${USER_ID}`);
+    const data = await r.json();
+    watches = (data.subs || []).map(s => ({
+      id: s.id, from: s.from_code, to: s.to_code,
+      date: s.date, from_st: s.from_st, to_st: s.to_st
+    }));
+    updateCnt();
+  } catch(e) {
+    console.error('Kuzatuvlarni yuklash xato:', e);
+    try { watches = JSON.parse(localStorage.getItem('rw_watches') || '[]'); } catch(e2) {}
+    updateCnt();
+  }
+}
 
 function saveWatches() {
   localStorage.setItem('rw_watches', JSON.stringify(watches));
@@ -153,7 +190,7 @@ function init() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('date').value = today;
   document.getElementById('date').min = today;
-  updateCnt();
+  loadWatches();
 }
 
 function showTab(tab) {
@@ -173,12 +210,14 @@ async function search() {
   const to = document.getElementById('to').value;
   const date = document.getElementById('date').value;
   const res = document.getElementById('results');
+  const filterArea = document.getElementById('filter-area');
 
-  if (!from || !to) { res.innerHTML = '<div class="error-msg">Stansiyalarni tanlang!</div>'; return; }
+  if (!from || to === '') { res.innerHTML = '<div class="error-msg">Stansiyalarni tanlang!</div>'; return; }
   if (from === to) { res.innerHTML = '<div class="error-msg">Boshqa stansiya tanlang!</div>'; return; }
   if (!date) { res.innerHTML = '<div class="error-msg">Sanani kiriting!</div>'; return; }
 
   res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
+  filterArea.innerHTML = '';
 
   try {
     const r = await fetch(`${BOT_URL}/api/trains`, {
@@ -187,10 +226,54 @@ async function search() {
       body: JSON.stringify({ from, to, date })
     });
     const data = await r.json();
-    renderTrains(data.trains || [], from, to, date);
+    lastTrains = data.trains || [];
+    lastSearch = { from, to, date };
+    activeFilters.clear();
+    buildFilters(lastTrains);
+    renderTrains(lastTrains, from, to, date);
   } catch(e) {
     res.innerHTML = '<div class="error-msg">Xato yuz berdi. Qayta urining.</div>';
   }
+}
+
+function buildFilters(trains) {
+  const filterArea = document.getElementById('filter-area');
+  const types = new Set();
+  trains.forEach(t => (t.cars || []).forEach(c => { if (c.type) types.add(c.type); }));
+  if (types.size <= 1) { filterArea.innerHTML = ''; return; }
+  let html = '<div class="filter-row">';
+  html += '<span class="filter-chip active" onclick="toggleFilter(\'all\', this)">Barchasi</span>';
+  types.forEach(type => {
+    html += `<span class="filter-chip" onclick="toggleFilter('${type}', this)">${type}</span>`;
+  });
+  html += '</div>';
+  filterArea.innerHTML = html;
+}
+
+function toggleFilter(type, el) {
+  if (type === 'all') {
+    activeFilters.clear();
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    document.querySelector('.filter-chip:first-child').classList.remove('active');
+    if (activeFilters.has(type)) {
+      activeFilters.delete(type);
+      el.classList.remove('active');
+    } else {
+      activeFilters.add(type);
+      el.classList.add('active');
+    }
+    if (activeFilters.size === 0) {
+      document.querySelector('.filter-chip:first-child').classList.add('active');
+    }
+  }
+  renderTrains(lastTrains, lastSearch.from, lastSearch.to, lastSearch.date);
+}
+
+function filterCars(cars) {
+  if (activeFilters.size === 0) return cars;
+  return cars.filter(c => activeFilters.has(c.type));
 }
 
 function renderTrains(trains, from, to, date) {
@@ -206,7 +289,8 @@ function renderTrains(trains, from, to, date) {
   let html = `<div class="result-header">${fromName} → ${toName} | ${trains.length} ta poyezd</div>`;
   trains.forEach(t => {
     const isW = watches.some(w => w.from === from && w.to === to && w.date === date);
-    const totalFree = (t.cars || []).reduce((s, c) => s + (c.freeSeats || 0), 0);
+    const cars = filterCars(t.cars || []);
+    const totalFree = cars.reduce((s, c) => s + (c.freeSeats || 0), 0);
     html += `<div class="train-card">
       <div class="train-top">
         <div><div class="train-brand">${t.brand || 'Poyezd'}</div><div class="train-num">${t.number || ''}</div></div>
@@ -221,7 +305,11 @@ function renderTrains(trains, from, to, date) {
         <div class="time-big">${(t.arrivalDate || '').split(' ')[1] || '--:--'}</div>
       </div>
       <div class="seats">
-        ${(t.cars || []).map(c => `<span class="seat-tag ${c.freeSeats > 0 ? 'has' : 'nope'}">${c.type}: ${c.freeSeats > 0 ? c.freeSeats + ' joy' : 'joy yoq'}</span>`).join('') || `<span class="seat-tag has">Jami: ${totalFree} joy</span>`}
+        ${cars.map(c => {
+          const price = c.price || (c.tariff && c.tariff.price) || 0;
+          const priceText = price ? `<span class="seat-price">${formatPrice(price)}</span>` : '';
+          return `<span class="seat-tag ${c.freeSeats > 0 ? 'has' : 'nope'}">${c.type}: ${c.freeSeats > 0 ? c.freeSeats + ' joy' : 'joy yoq'}${priceText}</span>`;
+        }).join('') || `<span class="seat-tag has">Jami: ${totalFree} joy</span>`}
       </div>
       <button class="btn-watch ${isW ? 'active' : ''}" onclick="toggleWatch('${from}','${to}','${date}','${t.brand || ''}',this)">
         ${isW ? '✓ Kuzatilmoqda' : '+ Kuzatuvga qo\'shish'}
@@ -231,20 +319,46 @@ function renderTrains(trains, from, to, date) {
   res.innerHTML = html;
 }
 
-function toggleWatch(from, to, date, brand, btn) {
+async function toggleWatch(from, to, date, brand, btn) {
   const idx = watches.findIndex(w => w.from === from && w.to === to && w.date === date);
   if (idx >= 0) {
+    const watch = watches[idx];
+    // Serverdan o'chirish
+    if (USER_ID && watch.id) {
+      try {
+        await fetch(`${BOT_URL}/api/subs/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: watch.id })
+        });
+      } catch(e) { console.error('O\'chirish xato:', e); }
+    }
     watches.splice(idx, 1);
     btn.className = 'btn-watch';
     btn.textContent = "+ Kuzatuvga qo'shish";
   } else {
-    watches.push({ from, to, date, brand, added: new Date().toISOString() });
+    // Serverga qo'shish
+    if (USER_ID) {
+      try {
+        const r = await fetch(`${BOT_URL}/api/subs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: USER_ID, from, to, date })
+        });
+        const data = await r.json();
+        if (data.ok) {
+          await loadWatches(); // Serverdan yangilash
+        }
+      } catch(e) { console.error('Qo\'shish xato:', e); }
+    } else {
+      watches.push({ from, to, date, brand, added: new Date().toISOString() });
+    }
     btn.className = 'btn-watch active';
     btn.textContent = '✓ Kuzatilmoqda';
-    if (tg) tg.showAlert('Kuzatuvga qo\'shildi! Har 5 daqiqada tekshirib turaman.');
+    if (tg) tg.showAlert("Kuzatuvga qo'shildi! Har 5 daqiqada tekshirib turaman.");
   }
   saveWatches();
-  if (tg) {
+  if (tg && !USER_ID) {
     tg.sendData(JSON.stringify({ action: 'watch', from, to, date }));
   }
 }
@@ -258,7 +372,7 @@ function renderWatches() {
   list.innerHTML = watches.map((w, i) => `
     <div class="watch-item">
       <div class="watch-info">
-        <div class="watch-route">${stName(w.from)} → ${stName(w.to)}</div>
+        <div class="watch-route">${w.from_st || stName(w.from)} → ${w.to_st || stName(w.to)}</div>
         <div class="watch-sub">${w.brand || 'Barcha'} | ${w.date}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -269,7 +383,18 @@ function renderWatches() {
   `).join('');
 }
 
-function delWatch(i) {
+async function delWatch(i) {
+  const watch = watches[i];
+  // Serverdan o'chirish
+  if (USER_ID && watch.id) {
+    try {
+      await fetch(`${BOT_URL}/api/subs/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: watch.id })
+      });
+    } catch(e) { console.error('O\'chirish xato:', e); }
+  }
   watches.splice(i, 1);
   saveWatches();
   renderWatches();
