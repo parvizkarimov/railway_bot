@@ -3,136 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Railway Kuzatuvchi</title>
+<title>Temir Yo'l Chiptalari</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root { --accent: #2EA6FF; --bg: var(--tg-theme-bg-color, #fff); --sec-bg: var(--tg-theme-secondary-bg-color, #f5f5f5); --text: var(--tg-theme-text-color, #000); --hint: var(--tg-theme-hint-color, #888); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 20px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); min-height: 100vh; }
+
 .app { max-width: 480px; margin: 0 auto; padding: 12px 16px; }
-.header { text-align: center; padding: 10px 0 20px; }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; background: var(--sec-bg); border-radius: 12px; padding: 4px; }
-.tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--hint); cursor: pointer; }
-.tab.active { background: var(--bg); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+.header { text-align: center; padding: 16px 0 20px; }
+.header h1 { font-size: 20px; font-weight: 600; }
+.header p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; }
+.tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--tg-theme-hint-color, #888); cursor: pointer; transition: all 0.2s; }
+.tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
 .section { display: none; }
 .section.active { display: block; }
 
-.card { background: var(--sec-bg); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
-.form-group { margin-bottom: 12px; }
-.label { font-size: 12px; font-weight: 600; opacity: 0.6; margin-bottom: 6px; display: block; text-transform: uppercase; }
-select, input { width: 100%; padding: 12px; border: none; border-radius: 12px; background: var(--bg); color: var(--text); font-size: 15px; }
-.btn-main { width: 100%; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; margin-top: 8px; }
+.card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
 
-/* Settings Modal */
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: flex-end; }
-.modal-content { background: var(--bg); width: 100%; border-radius: 20px 20px 0 0; padding: 20px; animation: slideUp 0.3s; }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; opacity: 0.6; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-select, .form-input { width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); font-size: 15px; font-family: inherit; appearance: none; -webkit-appearance: none; }
+.form-select:focus, .form-input:focus { outline: 2px solid var(--tg-theme-button-color, #2EA6FF); }
 
-.checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
-.check-tag { padding: 8px 14px; border-radius: 10px; background: var(--sec-bg); font-size: 14px; cursor: pointer; border: 1.5px solid transparent; }
-.check-tag.active { border-color: var(--accent); background: rgba(46, 166, 255, 0.1); color: var(--accent); }
+.swap-row { display: flex; justify-content: center; margin: -4px 0; }
+.swap-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; position: relative; }
 
-.train-card { background: var(--sec-bg); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
-.train-info { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.train-name { font-weight: 700; font-size: 16px; }
-.train-times { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; }
-.time { font-size: 20px; font-weight: 700; }
-.line { flex: 1; height: 1px; background: var(--hint); margin: 0 15px; opacity: 0.3; }
+.btn-primary { width: 100%; padding: 14px; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+.btn-primary:active { opacity: 0.85; }
 
-.seat-row { display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px; opacity: 0.8; }
-.btn-watch { width: 100%; padding: 10px; background: transparent; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 12px; font-weight: 600; margin-top: 12px; }
+.train-card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+.train-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.train-brand { font-size: 15px; font-weight: 600; }
+.train-num { font-size: 12px; opacity: 0.5; }
+.train-time-row { display: flex; align-items: center; gap: 0; }
+.time-big { font-size: 22px; font-weight: 700; }
+.time-mid { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.duration-text { font-size: 11px; opacity: 0.5; }
+.duration-line { width: 100%; height: 1px; background: rgba(0,0,0,0.15); }
+.station-small { font-size: 11px; opacity: 0.5; text-align: center; }
+.seats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; }
+.seat-tag.has { background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
+.seat-tag.nope { background: rgba(0,0,0,0.07); opacity: 0.6; }
+.seat-price { font-size: 10px; display: block; opacity: 0.7; margin-top: 2px; }
 
-.watch-item { background: var(--sec-bg); border-radius: 16px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-.watch-text { font-size: 15px; font-weight: 600; }
-.watch-sub { font-size: 12px; opacity: 0.6; margin-top: 4px; }
-.btn-del { background: none; border: none; color: #ff4d4d; font-size: 20px; padding: 5px; }
+.btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.btn-watch.active { background: rgba(46, 166, 255, 0.1); }
 
-.loading { text-align: center; padding: 40px; opacity: 0.5; }
+.watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.watch-info { flex: 1; }
+.watch-route { font-size: 15px; font-weight: 600; }
+.watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
+.btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
+
+/* Options Styling */
+.opt-section { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 10px; margin-top: 15px; border: 1px dashed rgba(0,0,0,0.1); }
+.opt-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; margin-bottom: 6px; display: block; font-weight: 700; }
+.chips { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.chip { font-size: 11px; padding: 5px 12px; border-radius: 20px; background: var(--tg-theme-bg-color, #fff); border: 1px solid rgba(0,0,0,0.1); color: var(--tg-theme-text-color, #000); cursor: pointer; }
+.chip.active { background: var(--tg-theme-button-color, #2EA6FF); color: #fff; border-color: var(--tg-theme-button-color, #2EA6FF); }
+
+.loading { text-align: center; padding: 30px; opacity: 0.6; }
+.spinner { width: 28px; height: 28px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--tg-theme-button-color, #2EA6FF); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <div class="app">
-    <div class="header"><h3>🚂 Railway Bilet</h3></div>
-    <div class="tabs">
-        <button class="tab active" onclick="showTab('search')">Qidirish</button>
-        <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
+  <div class="header"><h1>🚂 Temir yo'l</h1><p>Bilet kuzatuvchi</p></div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('search')">Qidirish</button>
+    <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
+  </div>
+
+  <div id="search" class="section active">
+    <div class="card">
+      <div class="form-group"><label class="form-label">Qayerdan</label><select class="form-select" id="from"></select></div>
+      <div class="swap-row"><button class="swap-btn" onclick="swap()">⇅</button></div>
+      <div class="form-group" style="margin-top:10px;"><label class="form-label">Qayerga</label><select class="form-select" id="to"></select></div>
+      <div class="form-group"><label class="form-label">Sana</label><input type="date" class="form-input" id="date"></div>
+      <button class="btn-primary" onclick="search()">Qidirish</button>
     </div>
+    <div id="results"></div>
+  </div>
 
-    <div id="search" class="section active">
-        <div class="card">
-            <div class="form-group"><label class="label">Qayerdan</label><select id="from"></select></div>
-            <div class="form-group"><label class="label">Qayerga</label><select id="to"></select></div>
-            <div class="form-group"><label class="label">Sana</label><input type="date" id="date"></div>
-            <button class="btn-main" onclick="onSearch()">Qidirish</button>
-        </div>
-        <div id="results"></div>
-    </div>
-
-    <div id="subs" class="section">
-        <div id="sub-list"></div>
-    </div>
-</div>
-
-<!-- Settings Modal -->
-<div id="modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-title">Kuzatuv sozlamalari</div>
-        
-        <label class="label">Tekshirish intervali</label>
-        <div class="checks" id="intervals">
-            <div class="check-tag" data-val="10">10 sek</div>
-            <div class="check-tag active" data-val="60">1 daqiqa</div>
-            <div class="check-tag" data-val="300">5 daqiqa</div>
-        </div>
-
-        <label class="label">O'rin turi</label>
-        <div class="checks" id="seatTypes">
-            <div class="check-tag active" data-val="lower">Pastki</div>
-            <div class="check-tag active" data-val="upper">Tepadagi</div>
-            <div class="check-tag active" data-val="sitting">O'tiradigan</div>
-        </div>
-
-        <label class="label">Maksimal narx (0 - cheksiz)</label>
-        <div class="form-group"><input type="number" id="maxPrice" value="0" placeholder="Masalan: 200000"></div>
-
-        <button class="btn-main" id="btnConfirm">Kuzatishni boshlash</button>
-        <button class="btn-watch" style="border:none; color:var(--hint)" onclick="closeModal()">Bekor qilish</button>
-    </div>
+  <div id="subs" class="section"><div id="wlist"></div></div>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
-tg.expand();
-
 const STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"};
 const stName = (c) => Object.keys(STATIONS).find(k => STATIONS[k] === c) || c;
 
-let currentWatchData = null;
-let subscriptions = [];
-
 function init() {
-    const f = document.getElementById('from');
-    const t = document.getElementById('to');
-    Object.keys(STATIONS).forEach(s => {
-        f.innerHTML += `<option value="${STATIONS[s]}">${s}</option>`;
-        t.innerHTML += `<option value="${STATIONS[s]}">${s}</option>`;
+    const f = document.getElementById('from'), t = document.getElementById('to');
+    Object.keys(STATIONS).forEach(n => {
+        f.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
+        t.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
     });
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    
-    // Tag selection
-    document.querySelectorAll('.checks').forEach(group => {
-        group.addEventListener('click', (e) => {
-            if (e.target.classList.contains('check-tag')) {
-                if (group.id === 'intervals') {
-                    group.querySelectorAll('.check-tag').forEach(t => t.classList.remove('active'));
-                    e.target.classList.add('active');
-                } else {
-                    e.target.classList.toggle('active');
-                }
-            }
-        });
-    });
     loadSubs();
 }
 
@@ -141,94 +114,101 @@ function showTab(t) {
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === t));
 }
 
-async function onSearch() {
+function swap() {
+    const f = document.getElementById('from'), t = document.getElementById('to');
+    [f.value, t.value] = [t.value, f.value];
+}
+
+async function search() {
     const res = document.getElementById('results');
-    res.innerHTML = '<div class="loading">Qidirilmoqda...</div>';
-    try {
-        const r = await fetch('/api/trains', {
-            method: 'POST',
-            body: JSON.stringify({from: document.getElementById('from').value, to: document.getElementById('to').value, date: document.getElementById('date').value})
-        });
-        const d = await r.json();
-        renderTrains(d.trains || []);
-    } catch(e) { res.innerHTML = 'Xatolik yuz berdi.'; }
+    res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
+    const r = await fetch('/api/trains', {
+        method: 'POST',
+        body: JSON.stringify({from: document.getElementById('from').value, to: document.getElementById('to').value, date: document.getElementById('date').value})
+    });
+    const d = await r.json();
+    renderTrains(d.trains || []);
 }
 
 function renderTrains(trains) {
     const res = document.getElementById('results');
     if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
     res.innerHTML = trains.map(t => {
-        const seats = (t.cars || []).map(c => `<div class="seat-row"><span>${c.type}</span><b>${c.freeSeats} joy</b></div>`).join('');
+        const seats = (t.cars || []).map(c => {
+            const p = c.price || (c.tariff && c.tariff.price) || 0;
+            return `<span class="seat-tag has">${c.type}: ${c.freeSeats} joy <span class="seat-price">${p.toLocaleString()} so'm</span></span>`;
+        }).join('');
+        
         return `
         <div class="train-card">
-            <div class="train-info"><span class="train-name">${t.brand || 'Poyezd'}</span><span>#${t.number}</span></div>
-            <div class="train-times">
-                <span class="time">${t.departureDate.split(' ')[1]}</span>
-                <div class="line"></div>
-                <span class="time">${t.arrivalDate.split(' ')[1]}</span>
+            <div class="train-top"><div class="train-brand">${t.brand}</div><div class="train-num">#${t.number}</div></div>
+            <div class="train-time-row">
+                <div class="time-big">${t.departureDate.split(' ')[1]}</div>
+                <div class="time-mid"><div class="duration-text">${t.timeOnWay}</div><div class="duration-line"></div><div class="station-small">${stName(document.getElementById('from').value)}</div></div>
+                <div class="time-big">${t.arrivalDate.split(' ')[1]}</div>
             </div>
-            <div>${seats}</div>
-            <button class="btn-watch" onclick="openModal('${t.brand}')">Kuzatishga qo'shish</button>
+            <div class="seats">${seats}</div>
+            <div class="opt-section">
+                <span class="opt-label">Interval</span>
+                <div class="chips" id="int-${t.number}">
+                    <span class="chip" onclick="setChip(this)">10s</span>
+                    <span class="chip active" onclick="setChip(this)">1m</span>
+                    <span class="chip" onclick="setChip(this)">5m</span>
+                </div>
+                <span class="opt-label">O'rin turi</span>
+                <div class="chips" id="type-${t.number}">
+                    <span class="chip active" data-val="lower" onclick="this.classList.toggle('active')">Pastki</span>
+                    <span class="chip active" data-val="upper" onclick="this.classList.toggle('active')">Tepadagi</span>
+                    <span class="chip active" data-val="sitting" onclick="this.classList.toggle('active')">O'tirish</span>
+                </div>
+                <button class="btn-watch" onclick="addWatch('${t.number}')">🔔 Kuzatishni boshlash</button>
+            </div>
         </div>`;
     }).join('');
 }
 
-function openModal(brand) {
-    currentWatchData = {
-        from: document.getElementById('from').value,
-        to: document.getElementById('to').value,
-        date: document.getElementById('date').value,
-        user_id: tg.initDataUnsafe?.user?.id || 0
-    };
-    document.getElementById('modal').style.display = 'flex';
+function setChip(el) {
+    el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
 }
 
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
-
-document.getElementById('btnConfirm').onclick = async () => {
-    const interval = document.querySelector('#intervals .active').dataset.val;
-    const prefs = Array.from(document.querySelectorAll('#seatTypes .active')).map(t => t.dataset.val);
-    const max_price = document.getElementById('maxPrice').value;
+async function addWatch(num) {
+    const iText = document.querySelector(`#int-${num} .active`).innerText;
+    const interval = iText === '10s' ? 10 : (iText === '1m' ? 60 : 300);
+    const prefs = Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val);
     
-    const payload = {...currentWatchData, interval, prefs, max_price};
-    
-    tg.MainButton.showProgress();
-    try {
-        const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify(payload) });
-        if (await r.json()) {
-            tg.showAlert("Kuzatuv yoqildi! Joy topilsa bot xabar beradi.");
-            closeModal();
-            loadSubs();
-        }
-    } catch(e) { tg.showAlert("Xato yuz berdi."); }
-    tg.MainButton.hideProgress();
-};
+    const r = await fetch('/api/subs', {
+        method: 'POST',
+        body: JSON.stringify({
+            user_id: tg.initDataUnsafe?.user?.id || 0,
+            from: document.getElementById('from').value,
+            to: document.getElementById('to').value,
+            date: document.getElementById('date').value,
+            interval, prefs
+        })
+    });
+    if (await r.json()) {
+        tg.showAlert("Kuzatuv yoqildi!");
+        loadSubs();
+    }
+}
 
 async function loadSubs() {
     const uid = tg.initDataUnsafe?.user?.id || 0;
     const r = await fetch(`/api/subs?user_id=${uid}`);
     const d = await r.json();
-    subscriptions = d.subs || [];
-    renderSubs();
-}
-
-function renderSubs() {
-    const list = document.getElementById('sub-list');
-    document.getElementById('cnt').innerText = subscriptions.length ? `(${subscriptions.length})` : '';
-    if (!subscriptions.length) { list.innerHTML = '<div class="loading">Hozircha kuzatuvlar yo\'q.</div>'; return; }
-    list.innerHTML = subscriptions.map(s => `
+    const sList = d.subs || [];
+    document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
+    const list = document.getElementById('wlist');
+    if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
+    list.innerHTML = sList.map(s => `
         <div class="watch-item">
-            <div>
-                <div class="watch-text">${s.from_st} → ${s.to_st}</div>
-                <div class="watch-sub">${s.date} | ${s.interval} sek | ${s.prefs.join(', ')}</div>
-            </div>
+            <div><div class="watch-route">${s.from_st} → ${s.to_st}</div><div class="watch-sub">${s.date} | ${s.interval}s | ${s.prefs.join(', ')}</div></div>
             <button class="btn-del" onclick="delSub(${s.id})">×</button>
-        </div>
-    `).join('');
+        </div>`).join('');
 }
 
 async function delSub(id) {
-    if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
     await fetch('/api/subs/delete', { method: 'POST', body: JSON.stringify({id}) });
     loadSubs();
 }
