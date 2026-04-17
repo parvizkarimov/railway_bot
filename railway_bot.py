@@ -189,6 +189,7 @@ async def checker():
                 found_text = ""
                 for t in trains:
                     match_cars = []
+                    total_train_seats = 0
                     for c in t.get("cars", []):
                         seats = c.get("freeSeats", 0)
                         if seats <= 0: continue
@@ -196,27 +197,29 @@ async def checker():
                         price = get_car_price(c)
                         if s_max_p > 0 and price > s_max_p: continue
                         
-                        # O'rin turi bo'yicha filtr
-                        p_types = c.get("placeTypes", []) # [{"name":"lower", "count":2}, ...]
-                        if not p_types: # Agar p_types bo'lmasa, umumiy joy deb hisoblaymiz
-                            match_cars.append(f"    {c.get('type','?')}: {seats} joy")
+                        p_types = c.get("placeTypes", [])
+                        if not p_types:
+                            match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
+                            total_train_seats += seats
                         else:
                             details = []
                             for pt in p_types:
                                 pt_name = pt.get("name", "").lower()
                                 pt_count = pt.get("count", 0)
                                 if pt_count > 0:
-                                    # Agar prefs bo'sh bo'lsa barchasini oladi, aks holda tanlanganini
                                     if not prefs or pt_name in prefs or (pt_name == "sitting" and c.get("type") == "O'tirish"):
-                                        details.append(f"{pt_name}: {pt_count}")
+                                        details.append(f"    {pt_name.capitalize()}: {pt_count} joy | {price:,} so'm")
+                                        total_train_seats += pt_count
                             if details:
-                                match_cars.append(f"    {c.get('type','?')}: {', '.join(details)} | {price:,} so'm")
+                                match_cars.append("\n".join(details))
                     
                     if match_cars:
-                        found_text += f"🚂 *{t.get('brand','?')}* ({t.get('number','')})\n" + "\n".join(match_cars) + "\n\n"
+                        dep_time = t.get('departureDate', '')
+                        arr_time = t.get('arrivalDate', '')
+                        found_text += f"✅ *{t.get('brand','Poyezd')}* — {total_train_seats} joy\n" + "\n".join(match_cars) + f"\n🕐 {dep_time} → {arr_time}\n\n"
 
                 if found_text:
-                    msg = f"🔔 *Joy topildi!*\n📍 {f_st} → {t_st}\n📅 {s_date}\n\n{found_text}👉 https://eticket.railway.uz"
+                    msg = f"🔔 *Bo'sh joy topildi!*\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
                     try: await bot.send_message(uid, msg, parse_mode="Markdown")
                     except: pass
         except Exception as e:
