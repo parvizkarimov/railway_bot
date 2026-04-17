@@ -119,10 +119,25 @@ def parse_trains(data):
     except: return []
 
 def get_car_price(car):
+    # v3 API da narx odatda 'tariffs' massivida keladi
     price = car.get("price", 0)
+    if not price:
+        tariffs = car.get("tariffs", [])
+        if tariffs and isinstance(tariffs, list):
+            price = tariffs[0].get("price", 0)
     if not price and isinstance(car.get("tariff"), dict):
         price = car.get("tariff", {}).get("price", 0)
     return price
+
+def format_pt_name(name):
+    names = {
+        "lower": "Pastki",
+        "upper": "Tepadagi",
+        "side_lower": "Yon pastki",
+        "side_upper": "Yon tepa",
+        "sitting": "O'tirish"
+    }
+    return names.get(name.lower(), name.capitalize())
 
 # ---- Database ----
 DB_PATH = "bot.db"
@@ -229,10 +244,11 @@ async def checker():
                                 pt_count = pt.get("count", 0)
                                 if pt_count > 0:
                                     if not prefs or pt_name in prefs or (pt_name == "sitting" and c.get("type") == "O'tirish"):
-                                        details.append(f"    {pt_name.capitalize()}: {pt_count} joy | {price:,} so'm")
+                                        match_cars.append(f"    {format_pt_name(pt_name)}: {pt_count} joy | {price:,} so'm")
                                         total_train_seats += pt_count
-                            if details:
-                                match_cars.append("\n".join(details))
+                            if not p_types:
+                                match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
+                                total_train_seats += seats
                     
                     if match_cars:
                         dep_time = t.get('departureDate', '')
