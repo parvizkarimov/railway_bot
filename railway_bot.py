@@ -130,27 +130,31 @@ def parse_trains(data):
 
 def get_car_price(car):
     # API'ning turli versiyalarida narx har xil joyda keladi
-    # 1. 'price' maydoni
+    # 1. To'g'ridan-to'g'ri 'price'
     price = car.get("price", 0)
     
-    # 2. 'tariffs' massivi ichida
+    # 2. 'tariff' obyekti ichida (eng ko'p uchraydigan holat)
+    if not price and isinstance(car.get("tariff"), (dict, int, float)):
+        t = car.get("tariff")
+        if isinstance(t, dict):
+            # 'price' yoki 'tariff' kaliti ostida bo'lishi mumkin
+            price = t.get("price") or t.get("tariff") or 0
+        else:
+            price = t
+            
+    # 3. 'tariffs' ro'yxati ichida
     if not price:
         tariffs = car.get("tariffs", [])
         if tariffs and isinstance(tariffs, list):
-            # Ba'zida 'price', ba'zida 'tariff' deb keladi
             price = tariffs[0].get("price") or tariffs[0].get("tariff") or 0
             
-    # 3. 'categories' ichida
+    # 4. 'categories' ichida
     if not price:
-        categories = car.get("categories", [])
-        if categories and isinstance(categories, list):
-            price = categories[0].get("price", 0)
+        cats = car.get("categories", [])
+        if cats and isinstance(cats, list):
+            price = cats[0].get("price") or cats[0].get("tariff") or 0
 
-    # 4. 'tariff' obyekti ichida
-    if not price and isinstance(car.get("tariff"), dict):
-        price = car.get("tariff", {}).get("price", 0)
-        
-    return price
+    return int(price) if price else 0
 
 def get_seat_details(car):
     # O'rinlarni seatDetail dan olish
