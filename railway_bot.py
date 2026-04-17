@@ -83,15 +83,16 @@ async def check_trains(from_code, to_code, date, _retry=0):
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
     cookie, xsrf = await get_cookie()
     headers = {
-        "Accept": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "uz-UZ,uz;q=0.9,ru;q=0.8,en;q=0.7",
         "Content-Type": "application/json",
         "Cookie": cookie,
         "X-Xsrf-Token": xsrf,
         "Device-Type": "BROWSER",
         "Origin": "https://eticket.railway.uz",
-        "Referer": "https://eticket.railway.uz/uz/home",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-        "Sec-Ch-Ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+        "Referer": "https://eticket.railway.uz/uz/pages/trains-page",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
         "Sec-Ch-Ua-Mobile": "?0",
         "Sec-Ch-Ua-Platform": '"Windows"',
         "Sec-Fetch-Dest": "empty",
@@ -106,7 +107,7 @@ async def check_trains(from_code, to_code, date, _retry=0):
             async with session.post(url, json=payload, headers=headers,
                                     timeout=aiohttp.ClientTimeout(total=30)) as r:
                 logging.info(f"API status: {r.status}")
-                logging.info(f"Yuborilgan: date={payload['directions']['forward']['date']}, from={payload['directions']['forward']['depStationCode']}, to={payload['directions']['forward']['arvStationCode']}")
+                logging.info(f"Payload: {json.dumps(payload)}")
                 logging.info(f"Cookie uzunligi: {len(headers['Cookie'])}, XSRF: {headers['X-Xsrf-Token']}")
                 if r.status == 200:
                     return await r.json(content_type=None)
