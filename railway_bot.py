@@ -83,8 +83,8 @@ async def get_cookie(force=False):
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-PORT = int(os.getenv("PORT", 8000))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "474681690"))
+PORT = int(os.getenv("PORT", 8080))
 
 STATIONS = {
     "Toshkent": "2900000", "Samarqand": "2900700", "Buxoro": "2900800",
@@ -130,27 +130,31 @@ def parse_trains(data):
 
 def get_car_price(car):
     # API'ning turli versiyalarida narx har xil joyda keladi
-    # 1. 'price' maydoni
+    # 1. To'g'ridan-to'g'ri 'price'
     price = car.get("price", 0)
     
-    # 2. 'tariffs' massivi ichida
+    # 2. 'tariff' obyekti ichida (eng ko'p uchraydigan holat)
+    if not price and isinstance(car.get("tariff"), (dict, int, float)):
+        t = car.get("tariff")
+        if isinstance(t, dict):
+            # 'price' yoki 'tariff' kaliti ostida bo'lishi mumkin
+            price = t.get("price") or t.get("tariff") or 0
+        else:
+            price = t
+            
+    # 3. 'tariffs' ro'yxati ichida
     if not price:
         tariffs = car.get("tariffs", [])
         if tariffs and isinstance(tariffs, list):
-            # Ba'zida 'price', ba'zida 'tariff' deb keladi
             price = tariffs[0].get("price") or tariffs[0].get("tariff") or 0
             
-    # 3. 'categories' ichida
+    # 4. 'categories' ichida
     if not price:
-        categories = car.get("categories", [])
-        if categories and isinstance(categories, list):
-            price = categories[0].get("price", 0)
+        cats = car.get("categories", [])
+        if cats and isinstance(cats, list):
+            price = cats[0].get("price") or cats[0].get("tariff") or 0
 
-    # 4. 'tariff' obyekti ichida
-    if not price and isinstance(car.get("tariff"), dict):
-        price = car.get("tariff", {}).get("price", 0)
-        
-    return price
+    return int(price) if price else 0
 
 def get_seat_details(car):
     # O'rinlarni seatDetail dan olish
@@ -178,11 +182,9 @@ def format_pt_name(name):
 DB_PATH = os.getenv("DB_PATH", "bot.db")
 
 async def init_db():
-    # Agar papka bo'lmasa yaratish
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir)
-        
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT,
@@ -278,6 +280,40 @@ async def success_payment_handler(msg: types.Message):
                  f"⭐ Miqdori: {amount} yulduz\n"
                  f"📅 Yangi muddat: {new_until[:10]}")
     await send_error_to_admin(admin_msg)
+
+@dp.message(Command("users"))
+async def cmd_admin_users(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    
+    users = await db("""
+        SELECT u.user_id, u.username, u.premium_until, 
+        (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.is_active = 1) as sub_count
+        FROM users u
+    """, fetch=True)
+    if not users:
+        return await msg.answer("Foydalanuvchilar topilmadi.")
+    
+    total = len(users)
+    text = f"👥 *Jami foydalanuvchilar:* {total}\n\n"
+    
+    for u_id, u_name, p_until, sub_count in users[:50]: # Birinchi 50 tasini ko'rsatish
+        status = "Oddiy"
+        if p_until:
+            try:
+                if datetime.fromisoformat(p_until) > datetime.now():
+                    status = f"✅ Premium ({p_until[:10]})"
+                else:
+                    status = f"❌ Muddati o'tgan ({p_until[:10]})"
+            except: pass
+        
+        name = u_name if u_name else "NoName"
+        text += f"👤 {name} (`{u_id}`) — {status} | 🔔 {sub_count} ta\n"
+    
+    if total > 50:
+        text += f"\n... va yana {total-50} ta foydalanuvchi."
+        
+    await msg.answer(text, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):

@@ -2,128 +2,360 @@
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Temir Yo'l Chiptalari</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); min-height: 100vh; }
+:root {
+    --tg-bg: var(--tg-theme-bg-color, #ffffff);
+    --tg-text: var(--tg-theme-text-color, #000000);
+    --tg-hint: var(--tg-theme-hint-color, #999999);
+    --tg-link: var(--tg-theme-link-color, #2EA6FF);
+    --tg-btn: var(--tg-theme-button-color, #2EA6FF);
+    --tg-btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --tg-secondary: var(--tg-theme-secondary-bg-color, #f0f0f0);
+    --accent-blue: #2EA6FF;
+    --accent-green: #34C759;
+    --accent-gold: #FFD700;
+}
 
-.app { max-width: 480px; margin: 0 auto; padding: 12px 16px; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-.header { text-align: center; padding: 16px 0 10px; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.header p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+body { 
+    font-family: 'Outfit', sans-serif; 
+    background: var(--tg-bg); 
+    color: var(--tg-text); 
+    overflow-x: hidden;
+    padding-bottom: 90px; /* Space for bottom nav */
+}
 
-.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; align-items: center; }
-.tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--tg-theme-hint-color, #888); cursor: pointer; transition: all 0.2s; }
-.tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-.premium-tag { font-size: 11px; padding: 4px 10px; color: #d4a017; font-weight: 700; cursor: pointer; border: 1px solid rgba(212, 160, 23, 0.2); border-radius: 20px; margin-right: 4px; }
+.app { max-width: 480px; margin: 0 auto; padding: 16px; }
 
+/* 3D Header Section */
+.header-glass {
+    background: linear-gradient(135deg, rgba(46, 166, 255, 0.1), rgba(46, 166, 255, 0.05));
+    border-radius: 24px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: center;
+    border: 1px solid rgba(46, 166, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+.header-glass::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+    pointer-events: none;
+}
+.header-icon {
+    font-size: 48px;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
+    margin-bottom: 10px;
+    display: inline-block;
+}
+.header-glass h1 { font-size: 22px; font-weight: 700; color: var(--tg-text); }
+.header-glass p { font-size: 14px; opacity: 0.7; }
+
+/* Navigation */
+.bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: var(--tg-bg);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.03);
+    z-index: 1000;
+    padding: 0 10px;
+}
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.nav-icon {
+    font-size: 24px;
+    opacity: 0.5;
+    transition: 0.3s;
+    filter: grayscale(1);
+}
+.nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.5;
+}
+.nav-item.active .nav-icon {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.1);
+    filter: grayscale(0) drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+.nav-item.active .nav-label { opacity: 1; color: var(--tg-btn); }
+
+/* Cards & Sections */
 .section { display: none; }
-.section.active { display: block; }
+.section.active { display: block; animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-.card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+.glass-card {
+    background: var(--tg-secondary);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(0,0,0,0.02);
+}
 
-.form-group { margin-bottom: 14px; }
-.form-label { font-size: 12px; opacity: 0.6; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
-.form-select, .form-input { width: 100%; padding: 12px 14px; border: none; border-radius: 12px; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); font-size: 15px; font-family: inherit; appearance: none; -webkit-appearance: none; }
-.form-select:focus, .form-input:focus { outline: 2px solid var(--tg-theme-button-color, #2EA6FF); }
+/* Form Styles */
+.form-group { margin-bottom: 18px; }
+.form-label { font-size: 11px; font-weight: 700; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
+.input-wrapper { position: relative; }
+.input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; }
+.form-select, .form-input {
+    width: 100%;
+    padding: 14px 14px 14px 44px;
+    border: none;
+    border-radius: 16px;
+    background: var(--tg-bg);
+    color: var(--tg-text);
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
 
-.swap-row { display: flex; justify-content: center; margin: -4px 0; }
-.swap-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; position: relative; }
+.swap-row { display: flex; justify-content: center; margin: -8px 0; position: relative; z-index: 10; }
+.swap-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 4px solid var(--tg-secondary);
+    background: var(--tg-btn);
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(46, 166, 255, 0.3);
+}
 
-.btn-primary { width: 100%; padding: 14px; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+.btn-main {
+    width: 100%;
+    padding: 16px;
+    background: var(--tg-btn);
+    color: var(--tg-btn-text);
+    border: none;
+    border-radius: 18px;
+    font-size: 16px;
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(46, 166, 255, 0.25);
+    cursor: pointer;
+}
 
-.train-card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
-.train-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.train-brand { font-size: 15px; font-weight: 600; }
-.train-num { font-size: 12px; opacity: 0.5; }
-.train-time-row { display: flex; align-items: center; gap: 0; }
-.time-big { font-size: 22px; font-weight: 700; }
-.time-mid { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.duration-text { font-size: 11px; opacity: 0.5; }
-.duration-line { width: 100%; height: 1px; background: rgba(0,0,0,0.15); }
-.station-small { font-size: 11px; opacity: 0.5; text-align: center; }
-.seats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-.seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
-.seat-price { font-size: 10px; display: block; opacity: 0.7; margin-top: 2px; }
+/* Results */
+.train-card {
+    background: var(--tg-secondary);
+    border-radius: 24px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+}
+.train-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+.train-brand { font-size: 16px; font-weight: 700; }
+.train-num { font-size: 12px; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 8px; opacity: 0.6; }
 
-.btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.btn-watch.active { background: rgba(46, 166, 100, 0.15); color: #1a8a50; border-color: #1a8a50; }
+.time-row { display: flex; align-items: center; justify-content: space-between; margin: 15px 0; }
+.time-box { text-align: center; }
+.time-val { font-size: 24px; font-weight: 700; }
+.time-st { font-size: 11px; opacity: 0.5; font-weight: 600; }
+.time-way { flex: 1; padding: 0 15px; text-align: center; position: relative; }
+.way-dur { font-size: 11px; font-weight: 600; opacity: 0.4; margin-bottom: 4px; display: block; }
+.way-line { height: 2px; background: rgba(0,0,0,0.08); position: relative; }
+.way-line::after { content: '🚂'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; }
 
-.opt-section { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 10px; margin-top: 15px; border: 1px dashed rgba(0,0,0,0.1); }
-.opt-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; margin-bottom: 6px; display: block; font-weight: 700; }
-.chips { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-.chip { font-size: 11px; padding: 5px 12px; border-radius: 20px; background: var(--tg-theme-bg-color, #fff); border: 1px solid rgba(0,0,0,0.1); color: var(--tg-theme-text-color, #000); cursor: pointer; }
-.chip.active { background: var(--tg-theme-button-color, #2EA6FF); color: #fff; border-color: var(--tg-theme-button-color, #2EA6FF); }
-.chip.locked { opacity: 0.5; cursor: not-allowed; position: relative; }
-.chip.locked::after { content: '🔒'; font-size: 8px; margin-left: 4px; }
+.seat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+.seat-box {
+    background: var(--tg-bg);
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.03);
+}
+.seat-name { font-size: 11px; font-weight: 700; opacity: 0.4; text-transform: uppercase; }
+.seat-cnt { font-size: 15px; font-weight: 700; color: var(--accent-green); }
+.seat-pr { font-size: 12px; font-weight: 600; opacity: 0.7; }
 
-.watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-.watch-route { font-size: 15px; font-weight: 600; }
-.watch-sub { font-size: 12px; opacity: 0.55; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
-.interval-badge { background: var(--tg-theme-button-color, #2EA6FF); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; }
-.btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
+.btn-track {
+    margin-top: 15px; width: 100%; padding: 12px;
+    background: transparent; border: 2px solid var(--tg-btn);
+    color: var(--tg-btn); border-radius: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.btn-track.added { background: var(--accent-green); color: #fff; border-color: var(--accent-green); }
 
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-end; }
-.modal-content { background: var(--tg-theme-bg-color, #fff); width: 100%; border-radius: 20px 20px 0 0; padding: 24px 20px; animation: slideUp 0.3s ease-out; }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
-.modal-sub { font-size: 13px; opacity: 0.6; text-align: center; margin-bottom: 20px; }
-.pay-options { display: flex; flex-direction: column; gap: 10px; }
-.pay-btn { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 14px; border: none; color: var(--tg-theme-text-color, #000); cursor: pointer; font-size: 15px; font-weight: 600; width: 100%; }
-.pay-btn:active { background: rgba(0,0,0,0.05); }
-.pay-star { color: #d4a017; font-weight: 700; }
+/* Premium & Chips */
+.premium-status-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(90deg, #FFD700 0%, #FFA500 100%);
+    padding: 12px 20px; border-radius: 18px; margin-bottom: 20px;
+    color: #fff; font-weight: 700; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
 
-.loading { text-align: center; padding: 30px; opacity: 0.6; }
-.spinner { width: 28px; height: 28px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--tg-theme-button-color, #2EA6FF); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.chip-group { margin-top: 12px; }
+.chips { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.chip {
+    padding: 8px 16px; border-radius: 12px; background: var(--tg-bg);
+    font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(0,0,0,0.05);
+}
+.chip.active { background: var(--tg-btn); color: #fff; border-color: var(--tg-btn); }
+.chip.locked { opacity: 0.5; cursor: not-allowed; }
+
+/* Subscriptions */
+.sub-card {
+    background: var(--tg-secondary); border-radius: 20px; padding: 18px; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.sub-info h3 { font-size: 16px; font-weight: 700; }
+.sub-meta { font-size: 12px; opacity: 0.5; margin-top: 4px; display: flex; gap: 10px; }
+.sub-int { background: var(--tg-btn); color: #fff; padding: 2px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+.sub-del { font-size: 24px; color: #ff3b30; opacity: 0.4; cursor: pointer; padding: 10px; }
+
+/* Modal */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 2000; align-items: flex-end; }
+.modal-c { background: var(--tg-bg); width: 100%; border-radius: 30px 30px 0 0; padding: 30px 20px; animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 20px; }
+.plan-btn {
+    display: flex; justify-content: space-between; align-items: center; padding: 20px;
+    background: var(--tg-secondary); border-radius: 20px; margin-bottom: 10px; border: none;
+    width: 100%; font-size: 16px; font-weight: 700; color: var(--tg-text); cursor: pointer;
+}
+.plan-price { color: #d4a017; }
+
+/* Loading */
+.loading { text-align: center; padding: 40px 0; }
+.spinner { width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.05); border-top-color: var(--tg-btn); border-radius: 50%; animation: rot 1s linear infinite; margin: 0 auto 15px; }
+@keyframes rot { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
+
 <div class="app">
-  <div class="header"><h1>🚂 Temir yo'l</h1><p>Bilet kuzatuvchi</p></div>
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('search')">Qidirish</button>
-    <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
-    <div class="premium-tag" id="premium-status" onclick="openPremiumModal()">Oddiy ⭐</div>
-  </div>
-
-  <div id="search" class="section active">
-    <div class="card">
-      <div class="form-group"><label class="form-label">Qayerdan</label><select class="form-select" id="from"></select></div>
-      <div class="swap-row"><button class="swap-btn" onclick="swap()">⇅</button></div>
-      <div class="form-group" style="margin-top:10px;"><label class="form-label">Qayerga</label><select class="form-select" id="to"></select></div>
-      <div class="form-group"><label class="form-label">Sana</label><input type="date" class="form-input" id="date"></div>
-      <button class="btn-primary" onclick="search()">Qidirish</button>
+    <!-- Header -->
+    <div class="header-glass">
+        <span class="header-icon">🚄</span>
+        <h1>Railway Bot</h1>
+        <p>Tezkor chipta kuzatuv tizimi</p>
     </div>
-    <div id="results"></div>
-  </div>
 
-  <div id="subs" class="section"><div id="wlist"></div></div>
+    <!-- Home/Search Section -->
+    <div id="search-section" class="section active">
+        <div class="glass-card">
+            <div class="form-group">
+                <label class="form-label">Qayerdan</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">📍</span>
+                    <select id="from" class="form-select"></select>
+                </div>
+            </div>
+            
+            <div class="swap-row">
+                <button class="swap-btn" onclick="swap()">⇅</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Qayerga</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🏁</span>
+                    <select id="to" class="form-select"></select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Ketish sanasi</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">📅</span>
+                    <input type="date" id="date" class="form-input">
+                </div>
+            </div>
+
+            <button class="btn-main" onclick="search()">🔍 Qidirish</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <!-- Subscriptions Section -->
+    <div id="subs-section" class="section">
+        <div id="wlist"></div>
+    </div>
+
+    <!-- Stars/Premium Section -->
+    <div id="stars-section" class="section">
+        <div class="premium-status-bar" id="p-status">
+            <span>Holat: Oddiy</span>
+            <span>⭐ 0</span>
+        </div>
+        
+        <div class="glass-card" style="text-align: center;">
+            <span style="font-size: 50px;">💎</span>
+            <h2 style="margin: 10px 0;">Premium Afzalliklari</h2>
+            <p style="opacity: 0.6; font-size: 14px; margin-bottom: 20px;">
+                • Tezkor kuzatuv (15s, 30s)<br>
+                • Cheksiz kuzatuvlar soni<br>
+                • Birinchilardan bo'lib xabar olish
+            </p>
+            <button class="btn-main" onclick="openPremiumModal()">Sotib olish</button>
+        </div>
+    </div>
 </div>
 
-<div id="premiumModal" class="modal" onclick="closeModal(event)">
-  <div class="modal-content" onclick="event.stopPropagation()">
-    <div class="modal-title">Premium Obuna</div>
-    <div class="modal-sub">Fast (15s/30s) intervallar va cheksiz kuzatuvlar uchun</div>
-    <div class="pay-options">
-      <button class="pay-btn" onclick="buyPremium(1)"><span>1 kunlik Premium</span> <span class="pay-star">1 ⭐</span></button>
-      <button class="pay-btn" onclick="buyPremium(5)"><span>5 kunlik Premium</span> <span class="pay-star">5 ⭐</span></button>
-      <button class="pay-btn" onclick="buyPremium(10)"><span>10 kunlik Premium</span> <span class="pay-star">10 ⭐</span></button>
+<!-- Bottom Navigation -->
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="navTo('search-section', this)">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Qidiruv</span>
     </div>
-    <button class="btn-primary" style="margin-top: 15px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000);" onclick="closeModal(null)">Yopish</button>
-  </div>
+    <div class="nav-item" onclick="navTo('subs-section', this)">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">Kuzatuv</span>
+    </div>
+    <div class="nav-item" onclick="navTo('stars-section', this)">
+        <span class="nav-icon">⭐</span>
+        <span class="nav-label">Stars</span>
+    </div>
+</div>
+
+<!-- Premium Modal -->
+<div id="premiumModal" class="modal" onclick="closeModal(event)">
+    <div class="modal-c" onclick="event.stopPropagation()">
+        <div class="modal-title">Premium Tanlang</div>
+        <div class="plan-btn" onclick="buyPremium(1)">
+            <span>1 kunlik</span> <span class="plan-price">1 ⭐</span>
+        </div>
+        <div class="plan-btn" onclick="buyPremium(5)">
+            <span>5 kunlik</span> <span class="plan-price">5 ⭐</span>
+        </div>
+        <div class="plan-btn" onclick="buyPremium(10)">
+            <span>10 kunlik</span> <span class="plan-price">10 ⭐</span>
+        </div>
+        <button class="btn-main" style="background: var(--tg-secondary); color: var(--tg-text); margin-top: 10px;" onclick="closeModal(null)">Yopish</button>
+    </div>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
 const STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"};
-const stName = (c) => Object.keys(STATIONS).find(k => STATIONS[k] === c) || c;
 let isPremium = false;
 
 function init() {
+    tg.expand(); // Full screen
+    tg.ready();
+    
     const f = document.getElementById('from'), t = document.getElementById('to');
     Object.keys(STATIONS).forEach(n => {
         f.innerHTML += `<option value="${STATIONS[n]}" ${n==='Toshkent'?'selected':''}>${n}</option>`;
@@ -133,9 +365,12 @@ function init() {
     loadSubs();
 }
 
-function showTab(t) {
-    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.getAttribute('onclick').includes(t)));
-    document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === t));
+function navTo(id, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    if (id === 'subs-section') loadSubs();
 }
 
 function swap() {
@@ -145,63 +380,79 @@ function swap() {
 
 async function search() {
     const f = document.getElementById('from').value, t = document.getElementById('to').value;
-    if (f === t) { tg.showAlert("Qayerdan va Qayerga bir xil bo'lishi mumkin emas!"); return; }
+    if (f === t) { tg.showAlert("Qayerdan va Qayerga bir xil bo'lishi mumkin!"); return; }
     const res = document.getElementById('results');
-    res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
-    const r = await fetch('/api/trains', { method: 'POST', body: JSON.stringify({from: f, to: t, date: document.getElementById('date').value}) });
-    const d = await r.json();
-    renderTrains(d.trains || []);
+    res.innerHTML = '<div class="loading"><div class="spinner"></div>Qidirilmoqda...</div>';
+    
+    try {
+        const r = await fetch('/api/trains', { method: 'POST', body: JSON.stringify({from: f, to: t, date: document.getElementById('date').value}) });
+        const d = await r.json();
+        renderTrains(d.trains || []);
+    } catch(e) {
+        res.innerHTML = '<div class="loading">Xatolik yuz berdi.</div>';
+    }
 }
 
 function renderTrains(trains) {
     const res = document.getElementById('results');
-    if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
+    if (!trains.length) { res.innerHTML = '<div class="loading">Bo\'sh joylar topilmadi.</div>'; return; }
+    
     res.innerHTML = trains.map(t => {
-        const seats = (t.cars || []).map(c => `<span class="seat-tag">${c.type}: ${c.freeSeats} joy <span class="seat-price">${(c.price||0).toLocaleString()} so'm</span></span>`).join('');
+        const seatHtml = (t.cars || []).map(c => `
+            <div class="seat-box">
+                <div class="seat-name">${c.type}</div>
+                <div class="seat-cnt">${c.freeSeats} joy</div>
+                <div class="seat-pr">${(c.price||0).toLocaleString()} so'm</div>
+            </div>
+        `).join('');
+        
         return `
         <div class="train-card">
-            <div class="train-top"><div class="train-brand">${t.brand}</div><div class="train-num">#${t.number}</div></div>
-            <div class="train-time-row">
-                <div class="time-big">${t.departureDate.split(' ')[1]}</div>
-                <div class="time-mid"><div class="duration-text">${t.timeOnWay}</div><div class="duration-line"></div><div class="station-small">${stName(document.getElementById('from').value)}</div></div>
-                <div class="time-big">${t.arrivalDate.split(' ')[1]}</div>
+            <div class="train-header">
+                <div><div class="train-brand">${t.brand}</div><div class="train-num">№ ${t.number}</div></div>
+                <span style="font-size: 20px;">🚆</span>
             </div>
-            <div class="seats">${seats}</div>
-            <div class="opt-section">
-                <span class="opt-label">Interval</span>
+            <div class="time-row">
+                <div class="time-box"><div class="time-val">${t.departureDate.split(' ')[1]}</div><div class="time-st">Dep</div></div>
+                <div class="time-way"><span class="way-dur">${t.timeOnWay}</span><div class="way-line"></div></div>
+                <div class="time-box"><div class="time-val">${t.arrivalDate.split(' ')[1]}</div><div class="time-st">Arr</div></div>
+            </div>
+            <div class="seat-grid">${seatHtml}</div>
+            
+            <div class="chip-group">
+                <span class="form-label">Interval</span>
                 <div class="chips" id="int-${t.number}">
                     <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s</span>
                     <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s</span>
                     <span class="chip active" onclick="setChip(this,60)">60s</span>
                 </div>
-                <span class="opt-label">O'rin turi</span>
-                <div class="chips" id="type-${t.number}">
-                    <span class="chip active" data-val="lower" onclick="this.classList.toggle('active')">Pastki</span>
-                    <span class="chip active" data-val="upper" onclick="this.classList.toggle('active')">Tepadagi</span>
-                    <span class="chip active" data-val="sitting" onclick="this.classList.toggle('active')">O'tirish</span>
-                </div>
-                <button class="btn-watch" onclick="addWatch('${t.number}')">🔔 Kuzatishni boshlash</button>
             </div>
+            
+            <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')">🔔 Kuzatuvni yoqish</button>
         </div>`;
     }).join('');
 }
 
 function setChip(el, sec) {
-    if (!isPremium && sec < 60) { openPremiumModal(); return; }
+    if (!isPremium && sec < 60) { navTo('stars-section', document.querySelectorAll('.nav-item')[2]); return; }
     el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
 }
 
 async function addWatch(num) {
+    const btn = document.getElementById(`btn-${num}`);
     const iText = document.querySelector(`#int-${num} .active`).innerText.replace('s','').replace('🔒','').trim();
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
         from: document.getElementById('from').value, to: document.getElementById('to').value,
         date: document.getElementById('date').value, interval: parseInt(iText),
-        prefs: Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val)
+        prefs: ["lower", "upper", "sitting"]
     }) });
     const res = await r.json();
-    if (res.ok) { tg.showAlert("Kuzatuv yoqildi!"); loadSubs(); } else { tg.showAlert("Xato: " + res.error); }
+    if (res.ok) { 
+        btn.innerText = "✅ Qo'shildi";
+        btn.classList.add('added');
+    } else { tg.showAlert(res.error); }
 }
 
 async function loadSubs() {
@@ -209,44 +460,40 @@ async function loadSubs() {
     const r = await fetch(`/api/subs?user_id=${uid}`);
     const d = await r.json();
     isPremium = d.is_premium;
-    const pTag = document.getElementById('premium-status');
+    
+    const ps = document.getElementById('p-status');
     if (isPremium) {
-        const diff = Math.ceil((new Date(d.premium_until) - new Date()) / (1000 * 60 * 60 * 24));
-        pTag.innerText = `${diff} kun ⭐`; pTag.style.color = '#1a8a50';
-    } else { pTag.innerText = 'Oddiy ⭐'; pTag.style.color = '#d4a017'; }
-    const sList = d.subs || [];
-    document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
-    const list = document.getElementById('wlist');
-    if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
-    list.innerHTML = sList.map(s => `<div class="watch-item">
-        <div>
-            <div class="watch-route">${s.from_st} → ${s.to_st}</div>
-            <div class="watch-sub">
-                ${s.date} | ${s.prefs.join(', ')} | 
-                <span class="interval-badge" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+        ps.innerHTML = `<span>Premium: Faol</span> <span>📅 ${d.premium_until}</span>`;
+        ps.style.background = 'linear-gradient(90deg, #34C759 0%, #2EA6FF 100%)';
+    } else {
+        ps.innerHTML = `<span>Holat: Oddiy</span> <span>⭐ 0</span>`;
+        ps.style.background = 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)';
+    }
+
+    const w = document.getElementById('wlist');
+    if (!d.subs || !d.subs.length) {
+        w.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>';
+    } else {
+        w.innerHTML = d.subs.map(s => `
+        <div class="sub-card">
+            <div class="sub-info">
+                <h3>${s.from_st} → ${s.to_st}</h3>
+                <div class="sub-meta">
+                    <span>${s.date}</span>
+                    <span class="sub-int" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+                </div>
             </div>
-        </div>
-        <button class="btn-del" onclick="delSub(${s.id})">×</button>
-    </div>`).join('');
+            <div class="sub-del" onclick="delSub(${s.id})">×</div>
+        </div>`).join('');
+    }
 }
 
-async function cycleInterval(id, current) {
-    const options = [60, 15, 30];
-    const nextIdx = (options.indexOf(current) + 1) % options.length;
-    const next = options[nextIdx];
-    
-    if (next < 60 && !isPremium) {
-        openPremiumModal();
-        return;
-    }
-    
-    const r = await fetch('/api/subs/update', { method: 'POST', body: JSON.stringify({id, interval: next}) });
-    const res = await r.json();
-    if (res.ok) {
-        loadSubs();
-    } else {
-        tg.showAlert("Xato: " + res.error);
-    }
+async function cycleInterval(id, curr) {
+    const opts = [60, 15, 30];
+    const next = opts[(opts.indexOf(curr) + 1) % opts.length];
+    if (next < 60 && !isPremium) { navTo('stars-section', document.querySelectorAll('.nav-item')[2]); return; }
+    await fetch('/api/subs/update', { method: 'POST', body: JSON.stringify({id, interval: next}) });
+    loadSubs();
 }
 
 async function delSub(id) {
@@ -263,12 +510,12 @@ async function buyPremium(days) {
     if (d.ok && d.link) {
         tg.openInvoice(d.link, (status) => {
             if (status === 'paid') {
-                tg.showAlert("To'lov muvaffaqiyatli! Premium yoqildi.");
                 closeModal(null);
                 loadSubs();
+                tg.showAlert("Tabriklaymiz! Premium faollashdi.");
             }
         });
-    } else { tg.showAlert("Xato: " + d.error); }
+    }
 }
 
 init();
