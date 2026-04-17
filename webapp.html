@@ -50,7 +50,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .seat-price { font-size: 10px; display: block; opacity: 0.7; margin-top: 2px; }
 
 .btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.btn-watch.active { background: rgba(46, 166, 100, 0.15); color: #1a8a50; border-color: #1a8a50; }
+.btn-watch.added { background: #1a8a50; color: #fff; border-color: #1a8a50; pointer-events: none; }
 
 .opt-section { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 10px; margin-top: 15px; border: 1px dashed rgba(0,0,0,0.1); }
 .opt-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; margin-bottom: 6px; display: block; font-weight: 700; }
@@ -136,6 +136,7 @@ function init() {
 function showTab(t) {
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.getAttribute('onclick').includes(t)));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === t));
+    if (t === 'subs') loadSubs();
 }
 
 function swap() {
@@ -180,7 +181,7 @@ function renderTrains(trains) {
                     <span class="chip active" data-val="upper" onclick="this.classList.toggle('active')">Tepadagi</span>
                     <span class="chip active" data-val="sitting" onclick="this.classList.toggle('active')">O'tirish</span>
                 </div>
-                <button class="btn-watch" onclick="addWatch('${t.number}')">🔔 Kuzatishni boshlash</button>
+                <button class="btn-watch" id="btn-${t.number}" onclick="addWatch('${t.number}')">🔔 Kuzatishni boshlash</button>
             </div>
         </div>`;
     }).join('');
@@ -193,6 +194,7 @@ function setChip(el, sec) {
 }
 
 async function addWatch(num) {
+    const btn = document.getElementById(`btn-${num}`);
     const iText = document.querySelector(`#int-${num} .active`).innerText.replace('s','').replace('🔒','').trim();
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
@@ -201,7 +203,13 @@ async function addWatch(num) {
         prefs: Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val)
     }) });
     const res = await r.json();
-    if (res.ok) { tg.showAlert("Kuzatuv yoqildi!"); loadSubs(); } else { tg.showAlert("Xato: " + res.error); }
+    if (res.ok) { 
+        btn.innerText = "✅ Qo'shildi";
+        btn.classList.add('added');
+        loadSubs(); 
+    } else { 
+        tg.showAlert("Xato: " + res.error); 
+    }
 }
 
 async function loadSubs() {
@@ -215,19 +223,22 @@ async function loadSubs() {
         pTag.innerText = `${diff} kun ⭐`; pTag.style.color = '#1a8a50';
     } else { pTag.innerText = 'Oddiy ⭐'; pTag.style.color = '#d4a017'; }
     const sList = d.subs || [];
-    document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
+    const cnt = document.getElementById('cnt');
+    if (cnt) cnt.innerText = sList.length ? `(${sList.length})` : '';
     const list = document.getElementById('wlist');
-    if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
-    list.innerHTML = sList.map(s => `<div class="watch-item">
-        <div>
-            <div class="watch-route">${s.from_st} → ${s.to_st}</div>
-            <div class="watch-sub">
-                ${s.date} | ${s.prefs.join(', ')} | 
-                <span class="interval-badge" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+    if (list) {
+        if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
+        list.innerHTML = sList.map(s => `<div class="watch-item">
+            <div>
+                <div class="watch-route">${s.from_st} → ${s.to_st}</div>
+                <div class="watch-sub">
+                    ${s.date} | ${s.prefs.join(', ')} | 
+                    <span class="interval-badge" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+                </div>
             </div>
-        </div>
-        <button class="btn-del" onclick="delSub(${s.id})">×</button>
-    </div>`).join('');
+            <button class="btn-del" onclick="delSub(${s.id})">×</button>
+        </div>`).join('');
+    }
 }
 
 async function cycleInterval(id, current) {
