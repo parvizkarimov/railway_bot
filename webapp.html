@@ -62,7 +62,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 .watch-route { font-size: 15px; font-weight: 600; }
-.watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
+.watch-sub { font-size: 12px; opacity: 0.55; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.interval-badge { background: var(--tg-theme-button-color, #2EA6FF); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; }
 .btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-end; }
@@ -218,9 +219,34 @@ async function loadSubs() {
     const list = document.getElementById('wlist');
     if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
     list.innerHTML = sList.map(s => `<div class="watch-item">
-        <div><div class="watch-route">${s.from_st} → ${s.to_st}</div><div class="watch-sub">${s.date} | ${s.interval}s | ${s.prefs.join(', ')}</div></div>
+        <div>
+            <div class="watch-route">${s.from_st} → ${s.to_st}</div>
+            <div class="watch-sub">
+                ${s.date} | ${s.prefs.join(', ')} | 
+                <span class="interval-badge" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+            </div>
+        </div>
         <button class="btn-del" onclick="delSub(${s.id})">×</button>
     </div>`).join('');
+}
+
+async function cycleInterval(id, current) {
+    const options = [60, 15, 30];
+    const nextIdx = (options.indexOf(current) + 1) % options.length;
+    const next = options[nextIdx];
+    
+    if (next < 60 && !isPremium) {
+        openPremiumModal();
+        return;
+    }
+    
+    const r = await fetch('/api/subs/update', { method: 'POST', body: JSON.stringify({id, interval: next}) });
+    const res = await r.json();
+    if (res.ok) {
+        loadSubs();
+    } else {
+        tg.showAlert("Xato: " + res.error);
+    }
 }
 
 async function delSub(id) {

@@ -30,6 +30,16 @@ async def send_error_to_admin(msg):
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
 COOKIE_TTL = 1500  # 25 daqiqa
 
+async def cookie_refresher():
+    """Orqa fonda cookielarni har 20 minutda yangilab turish"""
+    while True:
+        try:
+            await refresh_cookie()
+            logging.info("Fon rejimida cookie yangilandi")
+        except Exception as e:
+            logging.error(f"Fon rejimida cookie yangilashda xato: {e}")
+        await asyncio.sleep(1200) # 20 daqiqa
+
 async def refresh_cookie():
     """Playwright orqali yangi cookie olish"""
     try:
@@ -281,8 +291,44 @@ async def cb_my_subs(cb: types.CallbackQuery):
     buttons = []
     for s in subs:
         text += f"🚂 {s[1]} → {s[2]} | {s[3]}\n"
-        buttons.append([InlineKeyboardButton(text=f"❌ O'chirish {s[1]}→{s[2]}", callback_data=f"del|{s[0]}")])
+        buttons.append([
+            InlineKeyboardButton(text=f"⏱ Vaqt: {s[1]}→{s[2]}", callback_data=f"edit_int|{s[0]}"),
+            InlineKeyboardButton(text=f"❌ O'chirish", callback_data=f"del|{s[0]}")
+        ])
     await cb.message.answer(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+@dp.callback_query(F.data.startswith("edit_int|"))
+async def cb_edit_int_menu(cb: types.CallbackQuery):
+    try: await cb.answer()
+    except: pass
+    sid = cb.data.split("|")[1]
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="15 soniya ⭐", callback_data=f"set_int|{sid}|15")],
+        [InlineKeyboardButton(text="30 soniya ⭐", callback_data=f"set_int|{sid}|30")],
+        [InlineKeyboardButton(text="60 soniya", callback_data=f"set_int|{sid}|60")],
+        [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="my_subs")]
+    ])
+    await cb.message.edit_text("⏱ Yangi tekshirish intervalini tanlang:", reply_markup=kb)
+
+@dp.callback_query(F.data.startswith("set_int|"))
+async def cb_set_int(cb: types.CallbackQuery):
+    try: await cb.answer()
+    except: pass
+    _, sid, interval = cb.data.split("|")
+    interval = int(interval)
+    
+    # Premium tekshiruvi
+    if interval < 60:
+        user = await db("SELECT premium_until FROM users WHERE user_id=?", (cb.from_user.id,), fetch=True)
+        is_premium = False
+        if user and user[0][0]:
+            try: is_premium = datetime.fromisoformat(user[0][0]) > datetime.now()
+            except: pass
+        if not is_premium:
+            return await cb.message.answer("❌ 15s va 30s intervallar faqat Premium userlar uchun. Obunani bot boshida sotib olishingiz mumkin.")
+
+    await db("UPDATE subscriptions SET check_interval=? WHERE id=?", (interval, int(sid)))
+    await cb.message.edit_text(f"✅ Kuzatuv vaqti {interval} soniyaga o'zgartirildi.")
 
 @dp.callback_query(F.data.startswith("del|"))
 async def del_sub(cb: types.CallbackQuery):
@@ -438,6 +484,29 @@ async def handle_del_sub(request):
     await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(b.get("id")),))
     return web.json_response({"ok": True})
 
+async def handle_update_sub(request):
+    try:
+        b = await request.json()
+        sid = int(b.get("id"))
+        interval = int(b.get("interval"))
+        
+        # Premium tekshiruvi (agar interval 60dan kichik bo'lsa)
+        if interval < 60:
+            uid = await db("SELECT user_id FROM subscriptions WHERE id=?", (sid,), fetch=True)
+            if uid:
+                user = await db("SELECT premium_until FROM users WHERE user_id=?", (uid[0][0],), fetch=True)
+                is_premium = False
+                if user and user[0][0]:
+                    try: is_premium = datetime.fromisoformat(user[0][0]) > datetime.now()
+                    except: pass
+                if not is_premium:
+                    return web.json_response({"ok": False, "error": "Premium obuna talab qilinadi."})
+        
+        await db("UPDATE subscriptions SET check_interval=? WHERE id=?", (interval, sid))
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
 async def handle_create_invoice(request):
     try:
         b = await request.json()
@@ -463,6 +532,7 @@ async def start_webserver():
     app.router.add_get("/api/subs", handle_get_subs)
     app.router.add_post("/api/subs", handle_add_sub)
     app.router.add_post("/api/subs/delete", handle_del_sub)
+    app.router.add_post("/api/subs/update", handle_update_sub)
     app.router.add_post("/api/create_invoice", handle_create_invoice)
     runner = web.AppRunner(app)
     await runner.setup()
@@ -471,7 +541,9 @@ async def start_webserver():
 async def main():
     await init_db()
     await start_webserver()
-    await refresh_cookie()
+    
+    # Orqa fon vazifalarini ishga tushirish
+    asyncio.create_task(cookie_refresher())
     asyncio.create_task(checker())
     
     # Deploy xabari
