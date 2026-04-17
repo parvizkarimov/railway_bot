@@ -87,7 +87,7 @@ async def check_trains(from_code, to_code, date):
         "Sec-Fetch-Site": "same-origin",
     }
     payload = {"directions": {"forward": {
-        "date": date, "depStationCode": from_code, "arvStationCode": to_code
+        "date": ".".join(reversed(date.split("-"))) if "-" in date else date, "depStationCode": from_code, "arvStationCode": to_code
     }}}
     try:
         async with aiohttp.ClientSession() as session:
