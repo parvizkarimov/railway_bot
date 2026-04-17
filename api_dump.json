@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-04-17T15:39:00.512+00:00",
+  "path": "/api/v3/handbook/trains/list",
+  "status": 400,
+  "error": "Bad Request",
+  "requestId": "f82e8d90-1202472"
+}

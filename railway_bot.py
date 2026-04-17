@@ -239,10 +239,14 @@ async def checker():
                     match_cars = []
                     total_train_seats = 0
                     for c in t.get("cars", []):
+                        logging.info(f"DEBUG CAR DATA: {json.dumps(c)}")
                         seats = c.get("freeSeats", 0)
                         if seats <= 0: continue
                         
                         price = get_car_price(c)
+                        if seats > 0 and price == 0:
+                            await send_error_to_admin(f"Narx 0 chiqdi. Vagon ma'lumoti:\n`{json.dumps(c)}`")
+                        
                         if s_max_p > 0 and price > s_max_p: continue
                         
                         p_types = c.get("placeTypes", [])
