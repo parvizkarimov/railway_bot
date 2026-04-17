@@ -78,6 +78,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="tabs">
     <button class="tab active" onclick="showTab('search')">Qidirish</button>
     <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
+    <div style="font-size: 13px; display: flex; align-items: center; padding-right: 10px; color: var(--tg-theme-button-color, #2EA6FF); font-weight: 700;">
+        <span id="coin-cnt">0</span> 🪙
+    </div>
   </div>
 
   <div id="search" class="section active">
@@ -177,19 +180,21 @@ async function addWatch(num) {
     const interval = iText === '10s' ? 10 : (iText === '1m' ? 60 : 300);
     const prefs = Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val);
     
-    const r = await fetch('/api/subs', {
-        method: 'POST',
-        body: JSON.stringify({
-            user_id: tg.initDataUnsafe?.user?.id || 0,
-            from: document.getElementById('from').value,
-            to: document.getElementById('to').value,
-            date: document.getElementById('date').value,
-            interval, prefs
-        })
-    });
-    if (await r.json()) {
+    const payload = {
+        user_id: tg.initDataUnsafe?.user?.id || 0,
+        from: document.getElementById('from').value,
+        to: document.getElementById('to').value,
+        date: document.getElementById('date').value,
+        interval, prefs
+    };
+    
+    const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify(payload) });
+    const res = await r.json();
+    if (res.ok) {
         tg.showAlert("Kuzatuv yoqildi!");
         loadSubs();
+    } else {
+        tg.showAlert("Xato: " + (res.error || "Noma'lum xatolik"));
     }
 }
 
@@ -199,6 +204,7 @@ async function loadSubs() {
     const d = await r.json();
     const sList = d.subs || [];
     document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
+    document.getElementById('coin-cnt').innerText = d.coins || 0;
     const list = document.getElementById('wlist');
     if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
     list.innerHTML = sList.map(s => `

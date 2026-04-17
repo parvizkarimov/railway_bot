@@ -127,7 +127,8 @@ def get_car_price(car):
     if not price:
         tariffs = car.get("tariffs", [])
         if tariffs and isinstance(tariffs, list):
-            price = tariffs[0].get("price", 0)
+            # Ba'zida 'price', ba'zida 'tariff' deb keladi
+            price = tariffs[0].get("price") or tariffs[0].get("tariff") or 0
             
     # 3. 'categories' ichida
     if not price:
@@ -140,6 +141,16 @@ def get_car_price(car):
         price = car.get("tariff", {}).get("price", 0)
         
     return price
+
+def get_seat_details(car):
+    # O'rinlarni seatDetail dan olish
+    sd = car.get("seatDetail", {})
+    details = []
+    if sd.get("down", 0) > 0: details.append({"name": "lower", "count": sd["down"]})
+    if sd.get("up", 0) > 0: details.append({"name": "upper", "count": sd["up"]})
+    if sd.get("lateralDn", 0) > 0: details.append({"name": "side_lower", "count": sd["lateralDn"]})
+    if sd.get("lateralUp", 0) > 0: details.append({"name": "side_upper", "count": sd["lateralUp"]})
+    return details
 
 def format_pt_name(name):
     names = {
@@ -158,6 +169,7 @@ async def init_db():
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT,
+            coins INTEGER DEFAULT 0,
             is_premium INTEGER DEFAULT 0, premium_until TEXT)""")
         await conn.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,11 +196,47 @@ dp = Dispatcher(storage=MemoryStorage())
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
     await db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)", (msg.from_user.id, msg.from_user.username))
+    user = await db("SELECT coins FROM users WHERE user_id=?", (msg.from_user.id,), fetch=True)
+    coins = user[0][0] if user else 0
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚂 WebApp orqali kuzatish", web_app=WebAppInfo(url=WEBAPP_URL))],
-        [InlineKeyboardButton(text="📋 Kuzatuvlarim", callback_data="my_subs")]
+        [InlineKeyboardButton(text="📋 Kuzatuvlarim", callback_data="my_subs"), InlineKeyboardButton(text="💰 Tangalar", callback_data="buy_coins")]
     ])
-    await msg.answer("🚂 *Railway Bilet Kuzatuvchi*\n\nBarcha sozlamalar WebApp orqali amalga oshiriladi.", parse_mode="Markdown", reply_markup=kb)
+    await msg.answer(f"🚂 *Railway Bilet Kuzatuvchi*\n\n💰 Balansingiz: *{coins}* tanga\n\nLimit: 2 ta bepul kuzatuv. Qo'shimcha kuzatuv uchun 1 ta tanga kerak.", parse_mode="Markdown", reply_markup=kb)
+
+@dp.callback_query(F.data == "buy_coins")
+@dp.message(Command("tanga"))
+async def cmd_buy_coins(event):
+    msg = event if isinstance(event, types.Message) else event.message
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🪙 1 ta tanga (50 ⭐)", callback_data="pay|1|50")],
+        [InlineKeyboardButton(text="🪙 3 ta tanga (120 ⭐)", callback_data="pay|3|120")],
+        [InlineKeyboardButton(text="🪙 5 ta tanga (180 ⭐)", callback_data="pay|5|180")]
+    ])
+    await msg.answer("🪙 *Tanga sotib olish*\n\n2 tadan ko'p kuzatuv qo'shish uchun tanga kerak bo'ladi.", parse_mode="Markdown", reply_markup=kb)
+
+@dp.callback_query(F.data.startswith("pay|"))
+async def process_pay(cb: types.CallbackQuery):
+    _, count, price = cb.data.split("|")
+    await cb.message.answer_invoice(
+        title=f"{count} ta tanga",
+        description=f"Railway bot uchun {count} ta kuzatuv tangasi",
+        payload=f"coins_{count}",
+        provider_token="", # Telegram Stars uchun bo'sh qoladi
+        currency="XTR",
+        prices=[LabeledPrice(label="Coins", amount=int(price))]
+    )
+    await cb.answer()
+
+@dp.pre_checkout_query()
+async def pre_checkout_handler(query: types.PreCheckoutQuery):
+    await query.answer(ok=True)
+
+@dp.message(F.successful_payment)
+async def success_payment_handler(msg: types.Message):
+    count = int(msg.successful_payment.invoice_payload.split("_")[1])
+    await db("UPDATE users SET coins = coins + ? WHERE user_id = ?", (count, msg.from_user.id))
+    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta tanga qo'shildi. Endi bemalol yangi kuzatuvlar qo'shishingiz mumkin.")
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
@@ -239,22 +287,21 @@ async def checker():
                     match_cars = []
                     total_train_seats = 0
                     for c in t.get("cars", []):
-                        logging.info(f"DEBUG CAR DATA: {json.dumps(c)}")
                         seats = c.get("freeSeats", 0)
                         if seats <= 0: continue
                         
                         price = get_car_price(c)
-                        if seats > 0 and price == 0:
-                            await send_error_to_admin(f"Narx 0 chiqdi. Vagon ma'lumoti:\n`{json.dumps(c)}`")
-                        
                         if s_max_p > 0 and price > s_max_p: continue
                         
+                        # O'rinlarni placeTypes yoki seatDetail dan olish
                         p_types = c.get("placeTypes", [])
+                        if not p_types:
+                            p_types = get_seat_details(c)
+                            
                         if not p_types:
                             match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
                             total_train_seats += seats
                         else:
-                            details = []
                             for pt in p_types:
                                 pt_name = pt.get("name", "").lower()
                                 pt_count = pt.get("count", 0)
@@ -262,9 +309,6 @@ async def checker():
                                     if not prefs or pt_name in prefs or (pt_name == "sitting" and c.get("type") == "O'tirish"):
                                         match_cars.append(f"    {format_pt_name(pt_name)}: {pt_count} joy | {price:,} so'm")
                                         total_train_seats += pt_count
-                            if not p_types:
-                                match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
-                                total_train_seats += seats
                     
                     if match_cars:
                         dep_time = t.get('departureDate', '')
@@ -292,21 +336,38 @@ async def handle_trains_api(request):
 
 async def handle_get_subs(request):
     uid = request.query.get("user_id")
+    user = await db("SELECT coins FROM users WHERE user_id=?", (int(uid),), fetch=True)
+    coins = user[0][0] if user else 0
     subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
     res = []
     for s in (subs or []):
         res.append({"id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],"date":s[5],"interval":s[6],"prefs":json.loads(s[7]),"max_price":s[8]})
-    return web.json_response({"subs": res})
+    return web.json_response({"subs": res, "coins": coins})
 
 async def handle_add_sub(request):
     try:
         b = await request.json()
+        uid = int(b['user_id'])
+        
+        # Limitni tekshirish
+        active_subs = await db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1", (uid,), fetch=True)
+        count = active_subs[0][0] if active_subs else 0
+        
+        if count >= 2:
+            # Tanga borligini tekshirish
+            user = await db("SELECT coins FROM users WHERE user_id=?", (uid,), fetch=True)
+            coins = user[0][0] if user else 0
+            if coins < 1:
+                return web.json_response({"ok": False, "error": "Kuzatuv qo'shish uchun tanga yetarli emas (Limit: 2 ta bepul)."})
+            # Tanga yechish
+            await db("UPDATE users SET coins = coins - 1 WHERE user_id=?", (uid,))
+
         f_name = next((k for k, v in STATIONS.items() if v == b['from']), b['from'])
         t_name = next((k for k, v in STATIONS.items() if v == b['to']), b['to'])
         # JSON sifatida saqlash
         prefs = json.dumps(b.get("prefs", []))
         await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price) VALUES (?,?,?,?,?,?,?,?,?)",
-           (int(b['user_id']), f_name, t_name, b['from'], b['to'], b['date'], int(b.get('interval', 300)), prefs, int(b.get('max_price', 0))))
+           (uid, f_name, t_name, b['from'], b['to'], b['date'], int(b.get('interval', 300)), prefs, int(b.get('max_price', 0))))
         return web.json_response({"ok": True})
     except Exception as e: return web.json_response({"ok": False, "error": str(e)})
 
