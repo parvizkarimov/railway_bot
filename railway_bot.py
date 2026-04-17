@@ -28,7 +28,9 @@ async def refresh_cookie():
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
             )
             page = await context.new_page()
-            await page.goto("https://eticket.railway.uz/uz/home", wait_until="networkidle", timeout=60000)
+            await page.goto("https://eticket.railway.uz/uz/home", wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_timeout(5000)
+            await page.goto("https://eticket.railway.uz/uz/pages/trains-page", wait_until="networkidle", timeout=60000)
             await page.wait_for_timeout(3000)
             cookies = await context.cookies()
             cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
