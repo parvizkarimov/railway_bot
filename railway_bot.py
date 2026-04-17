@@ -286,14 +286,18 @@ async def cmd_admin_users(msg: types.Message):
     if msg.from_user.id != ADMIN_ID:
         return
     
-    users = await db("SELECT user_id, username, premium_until FROM users", fetch=True)
+    users = await db("""
+        SELECT u.user_id, u.username, u.premium_until, 
+        (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.is_active = 1) as sub_count
+        FROM users u
+    """, fetch=True)
     if not users:
         return await msg.answer("Foydalanuvchilar topilmadi.")
     
     total = len(users)
     text = f"👥 *Jami foydalanuvchilar:* {total}\n\n"
     
-    for u_id, u_name, p_until in users[:50]: # Birinchi 50 tasini ko'rsatish
+    for u_id, u_name, p_until, sub_count in users[:50]: # Birinchi 50 tasini ko'rsatish
         status = "Oddiy"
         if p_until:
             try:
@@ -304,7 +308,7 @@ async def cmd_admin_users(msg: types.Message):
             except: pass
         
         name = u_name if u_name else "NoName"
-        text += f"👤 {name} (`{u_id}`) — {status}\n"
+        text += f"👤 {name} (`{u_id}`) — {status} | 🔔 {sub_count} ta\n"
     
     if total > 50:
         text += f"\n... va yana {total-50} ta foydalanuvchi."
