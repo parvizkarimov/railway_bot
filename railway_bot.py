@@ -54,6 +54,7 @@ async def get_cookie():
         await refresh_cookie()
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHECK_INTERVAL = 300
 PORT = int(os.getenv("PORT", 8000))
 
@@ -340,6 +341,27 @@ async def paid(msg: types.Message):
     until = (datetime.now() + timedelta(days=3)).isoformat()
     db("UPDATE users SET is_premium=1, premium_until=? WHERE user_id=?", (until, msg.from_user.id))
     await msg.answer("🎉 *Premium faollashtirildi!*", parse_mode="Markdown")
+
+
+@dp.message(Command("setcookie"))
+async def cmd_setcookie(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        await msg.answer("❌ Ruxsat yo'q!")
+        return
+    parts = msg.text.split(" ", 1)
+    if len(parts) < 2:
+        await msg.answer("Format: /setcookie COOKIE_QIYMAT")
+        return
+    cookie_text = parts[1].strip()
+    xsrf_match = None
+    import re
+    m = re.search(r'XSRF-TOKEN=([^;]+)', cookie_text)
+    if m:
+        xsrf_match = unquote(m.group(1))
+    _cookie_cache["cookie"] = cookie_text
+    _cookie_cache["xsrf"] = xsrf_match or ""
+    _cookie_cache["updated"] = datetime.now()
+    await msg.answer(f"✅ Cookie yangilandi!\nUzunlik: {len(cookie_text)} belgi\nXSRF: {xsrf_match[:20] if xsrf_match else 'Topilmadi'}")
 
 async def checker():
     await asyncio.sleep(60)
