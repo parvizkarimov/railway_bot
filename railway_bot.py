@@ -202,18 +202,18 @@ async def cmd_start(msg: types.Message):
         [InlineKeyboardButton(text="🚂 WebApp orqali kuzatish", web_app=WebAppInfo(url=WEBAPP_URL))],
         [InlineKeyboardButton(text="📋 Kuzatuvlarim", callback_data="my_subs"), InlineKeyboardButton(text="💰 Tangalar", callback_data="buy_coins")]
     ])
-    await msg.answer(f"🚂 *Railway Bilet Kuzatuvchi*\n\n💰 Balansingiz: *{coins}* tanga\n\nLimit: 2 ta bepul kuzatuv. Qo'shimcha kuzatuv uchun 1 ta tanga kerak.", parse_mode="Markdown", reply_markup=kb)
+    await msg.answer(f"🚂 *Railway Bilet Kuzatuvchi*\n\n💰 Balansingiz: *{coins}* ⭐\n\nLimit: 2 ta bepul kuzatuv. Qo'shimcha kuzatuv uchun 1 ta ⭐ (Yulduz) kerak.", parse_mode="Markdown", reply_markup=kb)
 
 @dp.callback_query(F.data == "buy_coins")
-@dp.message(Command("tanga"))
+@dp.message(Command("stars"))
 async def cmd_buy_coins(event):
     msg = event if isinstance(event, types.Message) else event.message
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🪙 1 ta tanga (50 ⭐)", callback_data="pay|1|50")],
-        [InlineKeyboardButton(text="🪙 3 ta tanga (120 ⭐)", callback_data="pay|3|120")],
-        [InlineKeyboardButton(text="🪙 5 ta tanga (180 ⭐)", callback_data="pay|5|180")]
+        [InlineKeyboardButton(text="⭐ 1 ta Yulduz", callback_data="pay|1|1")],
+        [InlineKeyboardButton(text="⭐ 5 ta Yulduz", callback_data="pay|5|5")],
+        [InlineKeyboardButton(text="⭐ 10 ta Yulduz", callback_data="pay|10|10")]
     ])
-    await msg.answer("🪙 *Tanga sotib olish*\n\n2 tadan ko'p kuzatuv qo'shish uchun tanga kerak bo'ladi.", parse_mode="Markdown", reply_markup=kb)
+    await msg.answer("⭐ *Yulduzlar sotib olish*\n\n2 tadan ko'p kuzatuv qo'shish uchun Yulduzlar kerak bo'ladi.", parse_mode="Markdown", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("pay|"))
 async def process_pay(cb: types.CallbackQuery):
@@ -236,7 +236,7 @@ async def pre_checkout_handler(query: types.PreCheckoutQuery):
 async def success_payment_handler(msg: types.Message):
     count = int(msg.successful_payment.invoice_payload.split("_")[1])
     await db("UPDATE users SET coins = coins + ? WHERE user_id = ?", (count, msg.from_user.id))
-    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta tanga qo'shildi. Endi bemalol yangi kuzatuvlar qo'shishingiz mumkin.")
+    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta ⭐ qo'shildi. Endi bemalol yangi kuzatuvlar qo'shishingiz mumkin.")
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
@@ -358,8 +358,8 @@ async def handle_add_sub(request):
             user = await db("SELECT coins FROM users WHERE user_id=?", (uid,), fetch=True)
             coins = user[0][0] if user else 0
             if coins < 1:
-                return web.json_response({"ok": False, "error": "Kuzatuv qo'shish uchun tanga yetarli emas (Limit: 2 ta bepul)."})
-            # Tanga yechish
+                return web.json_response({"ok": False, "error": "Kuzatuv qo'shish uchun Yulduzlar (⭐) yetarli emas (Limit: 2 ta bepul)."})
+            # Yulduz yechish
             await db("UPDATE users SET coins = coins - 1 WHERE user_id=?", (uid,))
 
         f_name = next((k for k, v in STATIONS.items() if v == b['from']), b['from'])
