@@ -120,17 +120,19 @@ body {
 .form-label { font-size: 11px; font-weight: 700; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
 .input-wrapper { position: relative; }
 .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; }
-.form-select, .form-input {
-    width: 100%;
+.form-select, .form-input { 
+    width: 100%; 
     padding: 14px 14px 14px 44px;
-    border: none;
-    border-radius: 16px;
-    background: var(--tg-bg);
-    color: var(--tg-text);
-    font-size: 16px;
-    font-family: inherit;
+    border: none; 
+    border-radius: 16px; 
+    background: var(--tg-bg); 
+    color: var(--tg-text); 
+    font-size: 16px; 
+    font-family: inherit; 
     font-weight: 500;
     box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .swap-row { display: flex; justify-content: center; margin: -8px 0; position: relative; z-index: 10; }
@@ -395,7 +397,7 @@ async function search() {
 
 function renderTrains(trains) {
     const res = document.getElementById('results');
-    if (!trains.length) { res.innerHTML = '<div class="loading">Bo\'sh joylar topilmadi.</div>'; return; }
+    if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
     
     res.innerHTML = trains.map(t => {
         const seatHtml = (t.cars || []).map(c => `
@@ -417,7 +419,7 @@ function renderTrains(trains) {
                 <div class="time-way"><span class="way-dur">${t.timeOnWay}</span><div class="way-line"></div></div>
                 <div class="time-box"><div class="time-val">${t.arrivalDate.split(' ')[1]}</div><div class="time-st">Arr</div></div>
             </div>
-            <div class="seat-grid">${seatHtml}</div>
+            <div class="seat-grid">${seatHtml || '<div style="grid-column: 1/-1; text-align: center; opacity: 0.5; padding: 10px;">Chiptalar qolmagan</div>'}</div>
             
             <div class="chip-group">
                 <span class="form-label">Interval</span>
