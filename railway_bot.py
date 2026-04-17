@@ -207,6 +207,9 @@ async def cmd_start(msg: types.Message):
 @dp.callback_query(F.data == "buy_coins")
 @dp.message(Command("stars"))
 async def cmd_buy_coins(event):
+    if isinstance(event, types.CallbackQuery):
+        try: await event.answer()
+        except: pass
     msg = event if isinstance(event, types.Message) else event.message
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐ 1 ta Yulduz", callback_data="pay|1|1")],
@@ -217,16 +220,17 @@ async def cmd_buy_coins(event):
 
 @dp.callback_query(F.data.startswith("pay|"))
 async def process_pay(cb: types.CallbackQuery):
+    try: await cb.answer()
+    except: pass
     _, count, price = cb.data.split("|")
     await cb.message.answer_invoice(
-        title=f"{count} ta tanga",
-        description=f"Railway bot uchun {count} ta kuzatuv tangasi",
+        title=f"{count} ta Yulduz",
+        description=f"Railway bot uchun {count} ta kuzatuv yulduzi",
         payload=f"coins_{count}",
-        provider_token="", # Telegram Stars uchun bo'sh qoladi
+        provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="Coins", amount=int(price))]
+        prices=[LabeledPrice(label="Stars", amount=int(price))]
     )
-    await cb.answer()
 
 @dp.pre_checkout_query()
 async def pre_checkout_handler(query: types.PreCheckoutQuery):
@@ -237,11 +241,7 @@ async def success_payment_handler(msg: types.Message):
     count = int(msg.successful_payment.invoice_payload.split("_")[1])
     amount = msg.successful_payment.total_amount
     await db("UPDATE users SET coins = coins + ? WHERE user_id = ?", (count, msg.from_user.id))
-    
-    # Foydalanuvchiga xabar
     await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta ⭐ qo'shildi.")
-    
-    # Adminga xabar
     admin_msg = (f"💰 *Yangi to'lov!*\n\n"
                  f"👤 Kimdan: {msg.from_user.full_name} (@{msg.from_user.username})\n"
                  f"🆔 ID: `{msg.from_user.id}`\n"
@@ -251,6 +251,8 @@ async def success_payment_handler(msg: types.Message):
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
+    try: await cb.answer()
+    except: pass
     subs = await db("SELECT id,from_st,to_st,date FROM subscriptions WHERE user_id=? AND is_active=1", (cb.from_user.id,), fetch=True)
     if not subs:
         await cb.message.answer("📭 Kuzatuvlar yo'q.")
@@ -264,8 +266,9 @@ async def cb_my_subs(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("del|"))
 async def del_sub(cb: types.CallbackQuery):
+    try: await cb.answer()
+    except: pass
     await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(cb.data.split("|")[1]),))
-    await cb.answer("✅ O'chirildi")
     await cb.message.edit_text("✅ Kuzatuv o'chirildi.")
 
 # ---- Checker Logic ----
