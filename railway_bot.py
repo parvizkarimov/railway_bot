@@ -17,6 +17,15 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPri
 import json
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TOKEN")
+ADMIN_ID = 474681690  # Xatoliklar yuboriladigan ID
+
+async def send_error_to_admin(msg):
+    """Xatoliklarni adminga yuborish"""
+    try:
+        await bot.send_message(ADMIN_ID, f"⚠️ *BOT XATOLIGI:*\n\n{msg}", parse_mode="Markdown")
+    except:
+        logging.error(f"Admin xabar yuborishda xato: {msg}")
+
 # Cookie cache
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
 COOKIE_TTL = 1500  # 25 daqiqa
@@ -45,8 +54,15 @@ async def refresh_cookie():
                 _cookie_cache["updated"] = datetime.now()
                 logging.info(f"Cookie yangilandi")
                 return True
+            else:
+                await send_error_to_admin("Cookie yoki XSRF token olinmadi. Sayt strukturasi o'zgargan bo'lishi mumkin.")
     except Exception as e:
-        logging.error(f"Playwright xato: {e}")
+        err_msg = str(e)
+        logging.error(f"Playwright xato: {err_msg}")
+        if "timeout" in err_msg.lower():
+            await send_error_to_admin("Playwright timeout: Sayt juda sekin ishlayapti yoki IP bloklangan bo'lishi mumkin.")
+        else:
+            await send_error_to_admin(f"Playwright orqali cookie olishda xato: {err_msg}")
     return False
 
 async def get_cookie(force=False):
@@ -87,10 +103,15 @@ async def check_trains(from_code, to_code, date, _retry=0):
             async with session.post(url, json=payload, headers=headers, timeout=30) as r:
                 if r.status == 200:
                     return await r.json(content_type=None)
+                elif r.status == 403:
+                    await send_error_to_admin(f"❌ IP BLOKLANDI (Status 403). Railway sayti so'rovni rad etdi.")
                 elif r.status in (401, 419) and _retry < 2:
                     await get_cookie(force=True)
                     return await check_trains(from_code, to_code, date, _retry=_retry+1)
-    except: pass
+                else:
+                    logging.warning(f"API status xatosi: {r.status}")
+    except Exception as e:
+        logging.error(f"check_trains xato: {e}")
     return None
 
 def parse_trains(data):
