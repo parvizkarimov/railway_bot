@@ -119,14 +119,26 @@ def parse_trains(data):
     except: return []
 
 def get_car_price(car):
-    # v3 API da narx odatda 'tariffs' massivida keladi
+    # API'ning turli versiyalarida narx har xil joyda keladi
+    # 1. 'price' maydoni
     price = car.get("price", 0)
+    
+    # 2. 'tariffs' massivi ichida
     if not price:
         tariffs = car.get("tariffs", [])
         if tariffs and isinstance(tariffs, list):
             price = tariffs[0].get("price", 0)
+            
+    # 3. 'categories' ichida
+    if not price:
+        categories = car.get("categories", [])
+        if categories and isinstance(categories, list):
+            price = categories[0].get("price", 0)
+
+    # 4. 'tariff' obyekti ichida
     if not price and isinstance(car.get("tariff"), dict):
         price = car.get("tariff", {}).get("price", 0)
+        
     return price
 
 def format_pt_name(name):
