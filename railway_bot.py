@@ -99,6 +99,8 @@ async def check_trains(from_code, to_code, date):
             async with session.post(url, json=payload, headers=headers,
                                     timeout=aiohttp.ClientTimeout(total=30)) as r:
                 logging.info(f"API status: {r.status}")
+                logging.info(f"Yuborilgan: date={payload['directions']['forward']['date']}, from={payload['directions']['forward']['depStationCode']}, to={payload['directions']['forward']['arvStationCode']}")
+                logging.info(f"Cookie uzunligi: {len(headers['Cookie'])}, XSRF: {headers['X-Xsrf-Token']}")
                 if r.status == 200:
                     return await r.json(content_type=None)
                 else:
