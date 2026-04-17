@@ -188,7 +188,7 @@ async def cmd_test(msg: types.Message):
         f"Cookie: {len(cookie)} belgi\n"
         f"XSRF: {xsrf[:20] if xsrf else 'Yoq'}"
     )
-    result = await check_trains("2900000", "2900700", "2026-04-30")
+    result = await check_trains("2900000", "2900700", (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"))
     if result:
         trains = parse_trains(result)
         await msg.answer(f"✅ API ishlayapti!\n🚂 Poyezdlar: {len(trains)} ta")
@@ -255,7 +255,7 @@ async def got_to(cb: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.update_data(to_st=st, to_code=STATIONS[st])
     await cb.message.edit_text(
-        f"✅ Qayerdan: *{data['from_st']}*\n✅ Qayerga: *{st}*\n\n📅 *Sanani yuboring* (masalan: 2026-04-30)",
+        f"✅ Qayerdan: *{data['from_st']}*\n✅ Qayerga: *{st}*\n\n📅 *Sanani yuboring* (masalan: 2026-05-01)",
         parse_mode="Markdown")
     await state.set_state(Form.date)
 
@@ -265,7 +265,7 @@ async def got_date(msg: types.Message, state: FSMContext):
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
-        await msg.answer("❌ Format noto'g'ri! Masalan: *2026-04-30*", parse_mode="Markdown")
+        await msg.answer("❌ Format noto'g'ri! Masalan: *2026-05-01*", parse_mode="Markdown")
         return
     data = await state.get_data()
     await state.clear()
