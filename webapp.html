@@ -102,6 +102,22 @@ body {
 }
 .nav-item.active .nav-label { opacity: 1; color: var(--tg-btn); }
 
+.nav-badge {
+    position: absolute;
+    top: 5px;
+    right: 25%;
+    background: #34c759;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+    border: 2px solid var(--tg-bg);
+    display: none;
+}
+
 /* Cards & Sections */
 .section { display: none; }
 .section.active { display: block; animation: fadeIn 0.4s ease-out; }
@@ -322,9 +338,10 @@ body {
         <span class="nav-icon">🏠</span>
         <span class="nav-label">Qidiruv</span>
     </div>
-    <div class="nav-item" onclick="navTo('subs-section', this)">
+    <div class="nav-item" onclick="navTo('subs-section', this)" style="position: relative;">
         <span class="nav-icon">🔔</span>
         <span class="nav-label">Kuzatuv</span>
+        <div id="sub-badge" class="nav-badge">0</div>
     </div>
     <div class="nav-item" onclick="navTo('stars-section', this)">
         <span class="nav-icon">⭐</span>
@@ -419,7 +436,7 @@ function renderTrains(trains) {
                 <div class="time-way"><span class="way-dur">${t.timeOnWay}</span><div class="way-line"></div></div>
                 <div class="time-box"><div class="time-val">${t.arrivalDate.split(' ')[1]}</div><div class="time-st">Arr</div></div>
             </div>
-            <div class="seat-grid">${seatHtml || '<div style="grid-column: 1/-1; text-align: center; opacity: 0.5; padding: 10px;">Chiptalar qolmagan</div>'}</div>
+            <div class="seat-grid">${seatHtml || '<div style="grid-column: 1/-1; text-align: center; color: #ff3b30; background: rgba(255, 59, 48, 0.08); border: 1px solid rgba(255, 59, 48, 0.3); border-radius: 12px; padding: 12px; font-weight: 700; font-size: 13px;">⚠️ Chiptalar qolmagan</div>'}</div>
             
             <div class="chip-group">
                 <span class="form-label">Interval</span>
@@ -470,6 +487,14 @@ async function loadSubs() {
     } else {
         ps.innerHTML = `<span>Holat: Oddiy</span> <span>⭐ 0</span>`;
         ps.style.background = 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)';
+    }
+
+    const badge = document.getElementById('sub-badge');
+    if (d.subs && d.subs.length > 0) {
+        badge.innerText = d.subs.length;
+        badge.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
     }
 
     const w = document.getElementById('wlist');
