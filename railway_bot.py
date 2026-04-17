@@ -48,10 +48,8 @@ async def refresh_cookie():
     return False
 
 async def get_cookie():
-    """Cookie olish — eskirgan bo'lsa yangilash"""
-    updated = _cookie_cache.get("updated")
-    if not updated or (datetime.now() - updated).seconds > 1800 or not _cookie_cache["cookie"]:
-        await refresh_cookie()
+    """Har safar yangi cookie olish"""
+    await refresh_cookie()
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
