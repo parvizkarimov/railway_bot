@@ -37,7 +37,8 @@ async def refresh_cookie():
                 _cookie_cache["cookie"] = cookie_str
                 _cookie_cache["xsrf"] = xsrf
                 _cookie_cache["updated"] = datetime.now()
-                logging.info(f"Cookie yangilandi: {len(cookie_str)} belgi, XSRF: {xsrf[:20]}")
+                logging.info(f"Cookie: {cookie_str[:100]}")
+                logging.info(f"XSRF full: {xsrf}")
                 return True
     except Exception as e:
         logging.error(f"Playwright xato: {e}")
