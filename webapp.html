@@ -11,13 +11,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .app { max-width: 480px; margin: 0 auto; padding: 12px 16px; }
 
-.header { text-align: center; padding: 16px 0 20px; }
+.header { text-align: center; padding: 16px 0 10px; }
 .header h1 { font-size: 20px; font-weight: 600; }
 .header p { font-size: 13px; opacity: 0.6; margin-top: 4px; }
 
-.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; align-items: center; }
 .tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--tg-theme-hint-color, #888); cursor: pointer; transition: all 0.2s; }
 .tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.premium-tag { font-size: 11px; padding: 4px 8px; color: #d4a017; font-weight: 700; cursor: pointer; }
 
 .section { display: none; }
 .section.active { display: block; }
@@ -33,7 +34,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .swap-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; position: relative; }
 
 .btn-primary { width: 100%; padding: 14px; background: var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
-.btn-primary:active { opacity: 0.85; }
 
 .train-card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
 .train-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -46,26 +46,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .duration-line { width: 100%; height: 1px; background: rgba(0,0,0,0.15); }
 .station-small { font-size: 11px; opacity: 0.5; text-align: center; }
 .seats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-.seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; }
-.seat-tag.has { background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
-.seat-tag.nope { background: rgba(0,0,0,0.07); opacity: 0.6; }
+.seat-tag { font-size: 12px; padding: 5px 10px; border-radius: 8px; font-weight: 500; background: rgba(46, 166, 100, 0.15); color: #1a8a50; }
 .seat-price { font-size: 10px; display: block; opacity: 0.7; margin-top: 2px; }
 
-.btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.btn-watch { margin-top: 12px; width: 100%; padding: 11px; background: transparent; border: 1.5px solid var(--tg-theme-button-color, #2EA6FF); color: var(--tg-theme-button-color, #2EA6FF); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .btn-watch.active { background: rgba(46, 166, 100, 0.15); color: #1a8a50; border-color: #1a8a50; }
 
-.watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-.watch-info { flex: 1; }
-.watch-route { font-size: 15px; font-weight: 600; }
-.watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
-.btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
-
-/* Options Styling */
 .opt-section { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 10px; margin-top: 15px; border: 1px dashed rgba(0,0,0,0.1); }
 .opt-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; margin-bottom: 6px; display: block; font-weight: 700; }
 .chips { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 .chip { font-size: 11px; padding: 5px 12px; border-radius: 20px; background: var(--tg-theme-bg-color, #fff); border: 1px solid rgba(0,0,0,0.1); color: var(--tg-theme-text-color, #000); cursor: pointer; }
 .chip.active { background: var(--tg-theme-button-color, #2EA6FF); color: #fff; border-color: var(--tg-theme-button-color, #2EA6FF); }
+.chip.locked { opacity: 0.5; cursor: not-allowed; position: relative; }
+.chip.locked::after { content: '🔒'; font-size: 8px; margin-left: 4px; }
+
+.watch-item { background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.watch-route { font-size: 15px; font-weight: 600; }
+.watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
+.btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
 
 .loading { text-align: center; padding: 30px; opacity: 0.6; }
 .spinner { width: 28px; height: 28px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--tg-theme-button-color, #2EA6FF); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
@@ -78,9 +76,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="tabs">
     <button class="tab active" onclick="showTab('search')">Qidirish</button>
     <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
-    <div style="font-size: 13px; display: flex; align-items: center; padding-right: 10px; color: var(--tg-theme-button-color, #2EA6FF); font-weight: 700;">
-        <span id="coin-cnt">0</span> ⭐
-    </div>
+    <div class="premium-tag" id="premium-status" onclick="tg.showAlert('Premium obuna bo\'lsangiz, 15s/30s intervallar ochiladi!')">Oddiy ⭐</div>
   </div>
 
   <div id="search" class="section active">
@@ -101,12 +97,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 const tg = window.Telegram.WebApp;
 const STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"};
 const stName = (c) => Object.keys(STATIONS).find(k => STATIONS[k] === c) || c;
+let isPremium = false;
 
 function init() {
     const f = document.getElementById('from'), t = document.getElementById('to');
     Object.keys(STATIONS).forEach(n => {
-        f.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
-        t.innerHTML += `<option value="${STATIONS[n]}">${n}</option>`;
+        f.innerHTML += `<option value="${STATIONS[n]}" ${n==='Toshkent'?'selected':''}>${n}</option>`;
+        t.innerHTML += `<option value="${STATIONS[n]}" ${n==='Samarqand'?'selected':''}>${n}</option>`;
     });
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
     loadSubs();
@@ -123,12 +120,12 @@ function swap() {
 }
 
 async function search() {
+    const f = document.getElementById('from').value, t = document.getElementById('to').value;
+    if (f === t) { tg.showAlert("Qayerdan va Qayerga bir xil bo'lishi mumkin emas!"); return; }
+    
     const res = document.getElementById('results');
     res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
-    const r = await fetch('/api/trains', {
-        method: 'POST',
-        body: JSON.stringify({from: document.getElementById('from').value, to: document.getElementById('to').value, date: document.getElementById('date').value})
-    });
+    const r = await fetch('/api/trains', { method: 'POST', body: JSON.stringify({from: f, to: t, date: document.getElementById('date').value}) });
     const d = await r.json();
     renderTrains(d.trains || []);
 }
@@ -137,11 +134,7 @@ function renderTrains(trains) {
     const res = document.getElementById('results');
     if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
     res.innerHTML = trains.map(t => {
-        const seats = (t.cars || []).map(c => {
-            const p = c.price || (c.tariff && c.tariff.price) || 0;
-            return `<span class="seat-tag has">${c.type}: ${c.freeSeats} joy <span class="seat-price">${p.toLocaleString()} so'm</span></span>`;
-        }).join('');
-        
+        const seats = (t.cars || []).map(c => `<span class="seat-tag">${c.type}: ${c.freeSeats} joy <span class="seat-price">${(c.price||0).toLocaleString()} so'm</span></span>`).join('');
         return `
         <div class="train-card">
             <div class="train-top"><div class="train-brand">${t.brand}</div><div class="train-num">#${t.number}</div></div>
@@ -154,9 +147,9 @@ function renderTrains(trains) {
             <div class="opt-section">
                 <span class="opt-label">Interval</span>
                 <div class="chips" id="int-${t.number}">
-                    <span class="chip" onclick="setChip(this)">10s</span>
-                    <span class="chip active" onclick="setChip(this)">1m</span>
-                    <span class="chip" onclick="setChip(this)">5m</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s</span>
+                    <span class="chip active" onclick="setChip(this,60)">60s</span>
                 </div>
                 <span class="opt-label">O'rin turi</span>
                 <div class="chips" id="type-${t.number}">
@@ -170,48 +163,53 @@ function renderTrains(trains) {
     }).join('');
 }
 
-function setChip(el) {
+function setChip(el, sec) {
+    if (!isPremium && sec < 60) {
+        tg.showAlert("15s va 30s intervallar faqat Premium userlar uchun! Sotib olish uchun botga kiring.");
+        return;
+    }
     el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
 }
 
 async function addWatch(num) {
-    const iText = document.querySelector(`#int-${num} .active`).innerText;
-    const interval = iText === '10s' ? 10 : (iText === '1m' ? 60 : 300);
+    const iText = document.querySelector(`#int-${num} .active`).innerText.replace('s','').replace('🔒','').trim();
+    const interval = parseInt(iText);
     const prefs = Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val);
-    
-    const payload = {
+    const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
-        from: document.getElementById('from').value,
-        to: document.getElementById('to').value,
-        date: document.getElementById('date').value,
-        interval, prefs
-    };
-    
-    const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify(payload) });
+        from: document.getElementById('from').value, to: document.getElementById('to').value,
+        date: document.getElementById('date').value, interval, prefs
+    }) });
     const res = await r.json();
-    if (res.ok) {
-        tg.showAlert("Kuzatuv yoqildi!");
-        loadSubs();
-    } else {
-        tg.showAlert("Xato: " + (res.error || "Noma'lum xatolik"));
-    }
+    if (res.ok) { tg.showAlert("Kuzatuv yoqildi!"); loadSubs(); } else { tg.showAlert("Xato: " + res.error); }
 }
 
 async function loadSubs() {
     const uid = tg.initDataUnsafe?.user?.id || 0;
     const r = await fetch(`/api/subs?user_id=${uid}`);
     const d = await r.json();
+    isPremium = d.is_premium;
+    
+    // Premium status display
+    const pTag = document.getElementById('premium-status');
+    if (isPremium) {
+        const diff = Math.ceil((new Date(d.premium_until) - new Date()) / (1000 * 60 * 60 * 24));
+        pTag.innerText = `${diff} kun ⭐`;
+        pTag.style.color = '#1a8a50';
+    } else {
+        pTag.innerText = 'Oddiy ⭐';
+        pTag.style.color = '#d4a017';
+    }
+
     const sList = d.subs || [];
     document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
-    document.getElementById('coin-cnt').innerText = d.coins || 0;
     const list = document.getElementById('wlist');
     if (!sList.length) { list.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>'; return; }
-    list.innerHTML = sList.map(s => `
-        <div class="watch-item">
-            <div><div class="watch-route">${s.from_st} → ${s.to_st}</div><div class="watch-sub">${s.date} | ${s.interval}s | ${s.prefs.join(', ')}</div></div>
-            <button class="btn-del" onclick="delSub(${s.id})">×</button>
-        </div>`).join('');
+    list.innerHTML = sList.map(s => `<div class="watch-item">
+        <div><div class="watch-route">${s.from_st} → ${s.to_st}</div><div class="watch-sub">${s.date} | ${s.interval}s | ${s.prefs.join(', ')}</div></div>
+        <button class="btn-del" onclick="delSub(${s.id})">×</button>
+    </div>`).join('');
 }
 
 async function delSub(id) {

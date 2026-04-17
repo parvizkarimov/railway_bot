@@ -238,15 +238,28 @@ async def pre_checkout_handler(query: types.PreCheckoutQuery):
 
 @dp.message(F.successful_payment)
 async def success_payment_handler(msg: types.Message):
-    count = int(msg.successful_payment.invoice_payload.split("_")[1])
+    days = int(msg.successful_payment.invoice_payload.split("_")[1])
     amount = msg.successful_payment.total_amount
-    await db("UPDATE users SET coins = coins + ? WHERE user_id = ?", (count, msg.from_user.id))
-    await msg.answer(f"✅ To'lov muvaffaqiyatli! Balansingizga {count} ta ⭐ qo'shildi.")
-    admin_msg = (f"💰 *Yangi to'lov!*\n\n"
+    
+    # Premium muddatni hisoblash
+    user = await db("SELECT premium_until FROM users WHERE user_id=?", (msg.from_user.id,), fetch=True)
+    current_until = None
+    if user and user[0][0]:
+        try:
+            current_until = datetime.fromisoformat(user[0][0])
+        except: pass
+    
+    start_date = current_until if (current_until and current_until > datetime.now()) else datetime.now()
+    new_until = (start_date + timedelta(days=days)).isoformat()
+    
+    await db("UPDATE users SET premium_until = ? WHERE user_id = ?", (new_until, msg.from_user.id))
+    
+    await msg.answer(f"✅ Tabriklaymiz! Premium obunangiz {days} kunga uzaytirildi.\n📅 Muddat: {new_until[:10]}")
+    
+    admin_msg = (f"💰 *Yangi to'lov (Premium)!*\n\n"
                  f"👤 Kimdan: {msg.from_user.full_name} (@{msg.from_user.username})\n"
-                 f"🆔 ID: `{msg.from_user.id}`\n"
                  f"⭐ Miqdori: {amount} yulduz\n"
-                 f"📦 Paket: {count} ta tanga")
+                 f"📅 Yangi muddat: {new_until[:10]}")
     await send_error_to_admin(admin_msg)
 
 @dp.callback_query(F.data == "my_subs")
@@ -350,35 +363,55 @@ async def handle_trains_api(request):
 
 async def handle_get_subs(request):
     uid = request.query.get("user_id")
-    user = await db("SELECT coins FROM users WHERE user_id=?", (int(uid),), fetch=True)
-    coins = user[0][0] if user else 0
+    user = await db("SELECT premium_until FROM users WHERE user_id=?", (int(uid),), fetch=True)
+    
+    premium_until = user[0][0] if user else None
+    is_premium = False
+    if premium_until:
+        try:
+            is_premium = datetime.fromisoformat(premium_until) > datetime.now()
+        except: pass
+
     subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
     res = []
     for s in (subs or []):
         res.append({"id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],"date":s[5],"interval":s[6],"prefs":json.loads(s[7]),"max_price":s[8]})
-    return web.json_response({"subs": res, "coins": coins})
+    
+    return web.json_response({
+        "subs": res, 
+        "is_premium": is_premium, 
+        "premium_until": premium_until[:10] if premium_until else None
+    })
 
 async def handle_add_sub(request):
     try:
         b = await request.json()
         uid = int(b['user_id'])
         
-        # Limitni tekshirish
-        active_subs = await db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1", (uid,), fetch=True)
-        count = active_subs[0][0] if active_subs else 0
-        
-        if count >= 2:
-            # Tanga borligini tekshirish
-            user = await db("SELECT coins FROM users WHERE user_id=?", (uid,), fetch=True)
-            coins = user[0][0] if user else 0
-            if coins < 1:
-                return web.json_response({"ok": False, "error": "Kuzatuv qo'shish uchun Yulduzlar (⭐) yetarli emas (Limit: 2 ta bepul)."})
-            # Yulduz yechish
-            await db("UPDATE users SET coins = coins - 1 WHERE user_id=?", (uid,))
+        # Premium statusni tekshirish
+        user = await db("SELECT premium_until FROM users WHERE user_id=?", (uid,), fetch=True)
+        is_premium = False
+        if user and user[0][0]:
+            try:
+                is_premium = datetime.fromisoformat(user[0][0]) > datetime.now()
+            except: pass
+
+        # Oddiy userlar uchun cheklovlar
+        if not is_premium:
+            active_subs = await db("SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND is_active=1", (uid,), fetch=True)
+            if active_subs and active_subs[0][0] >= 2:
+                return web.json_response({"ok": False, "error": "Limitga yetdingiz (2 ta). Ko'proq kuzatuv uchun Premium obuna bo'ling."})
+            
+            # Intervalni 60s ga majburlash
+            interval = int(b.get('interval', 300))
+            if interval < 60:
+                return web.json_response({"ok": False, "error": "Tezkor intervallar (15s, 30s) faqat Premium userlar uchun."})
 
         f_name = next((k for k, v in STATIONS.items() if v == b['from']), b['from'])
         t_name = next((k for k, v in STATIONS.items() if v == b['to']), b['to'])
-        # JSON sifatida saqlash
+        if f_name == t_name:
+            return web.json_response({"ok": False, "error": "Qayerdan va Qayerga bir xil bo'lishi mumkin emas."})
+
         prefs = json.dumps(b.get("prefs", []))
         await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price) VALUES (?,?,?,?,?,?,?,?,?)",
            (uid, f_name, t_name, b['from'], b['to'], b['date'], int(b.get('interval', 300)), prefs, int(b.get('max_price', 0))))
