@@ -83,8 +83,8 @@ async def get_cookie(force=False):
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-PORT = int(os.getenv("PORT", 8000))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "474681690"))
+PORT = int(os.getenv("PORT", 8080))
 
 STATIONS = {
     "Toshkent": "2900000", "Samarqand": "2900700", "Buxoro": "2900800",
@@ -178,11 +178,9 @@ def format_pt_name(name):
 DB_PATH = os.getenv("DB_PATH", "bot.db")
 
 async def init_db():
-    # Agar papka bo'lmasa yaratish
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir)
-        
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT,
