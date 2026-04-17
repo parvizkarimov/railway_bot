@@ -163,9 +163,16 @@ def format_pt_name(name):
     return names.get(name.lower(), name.capitalize())
 
 # ---- Database ----
-DB_PATH = "bot.db"
+# DOIMIY XOTIRA UCHUN: Railway yoki shunga o'xshash joyda /data papkasini ulab, 
+# DB_PATH ni "/data/bot.db" qilib qo'yishingiz kerak.
+DB_PATH = os.getenv("DB_PATH", "bot.db")
 
 async def init_db():
+    # Agar papka bo'lmasa yaratish
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+        
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT,
@@ -358,7 +365,14 @@ async def handle_trains_api(request):
     try:
         body = await request.json()
         result = await check_trains(body.get("from"), body.get("to"), body.get("date"))
-        return web.json_response({"trains": parse_trains(result) if result else []})
+        trains = parse_trains(result) if result else []
+        
+        # WebApp uchun narxlarni oldindan hisoblab chiqish
+        for t in trains:
+            for c in t.get("cars", []):
+                c["price"] = get_car_price(c)
+                
+        return web.json_response({"trains": trains})
     except: return web.json_response({"trains": []})
 
 async def handle_get_subs(request):
@@ -375,13 +389,14 @@ async def handle_get_subs(request):
     subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
     res = []
     for s in (subs or []):
-        res.append({"id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],"date":s[5],"interval":s[6],"prefs":json.loads(s[7]),"max_price":s[8]})
-    
-    return web.json_response({
-        "subs": res, 
-        "is_premium": is_premium, 
-        "premium_until": premium_until[:10] if premium_until else None
-    })
+        prefs = json.loads(s[7])
+        # Tarjima qilingan prefs
+        uz_prefs = [format_pt_name(p) for p in prefs]
+        res.append({
+            "id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],
+            "date":s[5],"interval":s[6],"prefs":uz_prefs,"max_price":s[8]
+        })
+    return web.json_response({"subs": res, "is_premium": is_premium, "premium_until": premium_until[:10] if premium_until else None})
 
 async def handle_add_sub(request):
     try:
@@ -423,6 +438,24 @@ async def handle_del_sub(request):
     await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (int(b.get("id")),))
     return web.json_response({"ok": True})
 
+async def handle_create_invoice(request):
+    try:
+        b = await request.json()
+        days = int(b.get("days", 1))
+        price = 1 if days == 1 else (5 if days == 5 else 10)
+        
+        link = await bot.create_invoice_link(
+            title=f"{days} kunlik Premium",
+            description=f"Railway bot uchun {days} kunlik premium obuna",
+            payload=f"coins_{days}",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="Stars", amount=price)]
+        )
+        return web.json_response({"ok": True, "link": link})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
 async def start_webserver():
     app = web.Application()
     app.router.add_get("/", handle_webapp)
@@ -430,6 +463,7 @@ async def start_webserver():
     app.router.add_get("/api/subs", handle_get_subs)
     app.router.add_post("/api/subs", handle_add_sub)
     app.router.add_post("/api/subs/delete", handle_del_sub)
+    app.router.add_post("/api/create_invoice", handle_create_invoice)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()

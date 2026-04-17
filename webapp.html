@@ -18,7 +18,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 12px; padding: 4px; align-items: center; }
 .tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--tg-theme-hint-color, #888); cursor: pointer; transition: all 0.2s; }
 .tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-.premium-tag { font-size: 11px; padding: 4px 8px; color: #d4a017; font-weight: 700; cursor: pointer; }
+.premium-tag { font-size: 11px; padding: 4px 10px; color: #d4a017; font-weight: 700; cursor: pointer; border: 1px solid rgba(212, 160, 23, 0.2); border-radius: 20px; margin-right: 4px; }
 
 .section { display: none; }
 .section.active { display: block; }
@@ -65,6 +65,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .watch-sub { font-size: 13px; opacity: 0.55; margin-top: 3px; }
 .btn-del { background: none; border: none; font-size: 20px; opacity: 0.4; cursor: pointer; padding: 4px 8px; }
 
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-end; }
+.modal-content { background: var(--tg-theme-bg-color, #fff); width: 100%; border-radius: 20px 20px 0 0; padding: 24px 20px; animation: slideUp 0.3s ease-out; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
+.modal-sub { font-size: 13px; opacity: 0.6; text-align: center; margin-bottom: 20px; }
+.pay-options { display: flex; flex-direction: column; gap: 10px; }
+.pay-btn { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); border-radius: 14px; border: none; color: var(--tg-theme-text-color, #000); cursor: pointer; font-size: 15px; font-weight: 600; width: 100%; }
+.pay-btn:active { background: rgba(0,0,0,0.05); }
+.pay-star { color: #d4a017; font-weight: 700; }
+
 .loading { text-align: center; padding: 30px; opacity: 0.6; }
 .spinner { width: 28px; height: 28px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--tg-theme-button-color, #2EA6FF); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -76,7 +86,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="tabs">
     <button class="tab active" onclick="showTab('search')">Qidirish</button>
     <button class="tab" onclick="showTab('subs')">Kuzatuvlar <span id="cnt"></span></button>
-    <div class="premium-tag" id="premium-status" onclick="tg.showAlert('Premium obuna bo\'lsangiz, 15s/30s intervallar ochiladi!')">Oddiy ⭐</div>
+    <div class="premium-tag" id="premium-status" onclick="openPremiumModal()">Oddiy ⭐</div>
   </div>
 
   <div id="search" class="section active">
@@ -91,6 +101,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 
   <div id="subs" class="section"><div id="wlist"></div></div>
+</div>
+
+<div id="premiumModal" class="modal" onclick="closeModal(event)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-title">Premium Obuna</div>
+    <div class="modal-sub">Fast (15s/30s) intervallar va cheksiz kuzatuvlar uchun</div>
+    <div class="pay-options">
+      <button class="pay-btn" onclick="buyPremium(1)"><span>1 kunlik Premium</span> <span class="pay-star">1 ⭐</span></button>
+      <button class="pay-btn" onclick="buyPremium(5)"><span>5 kunlik Premium</span> <span class="pay-star">5 ⭐</span></button>
+      <button class="pay-btn" onclick="buyPremium(10)"><span>10 kunlik Premium</span> <span class="pay-star">10 ⭐</span></button>
+    </div>
+    <button class="btn-primary" style="margin-top: 15px; background: var(--tg-theme-secondary-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000);" onclick="closeModal(null)">Yopish</button>
+  </div>
 </div>
 
 <script>
@@ -122,7 +145,6 @@ function swap() {
 async function search() {
     const f = document.getElementById('from').value, t = document.getElementById('to').value;
     if (f === t) { tg.showAlert("Qayerdan va Qayerga bir xil bo'lishi mumkin emas!"); return; }
-    
     const res = document.getElementById('results');
     res.innerHTML = '<div class="loading"><div class="spinner"></div>Tekshirilmoqda...</div>';
     const r = await fetch('/api/trains', { method: 'POST', body: JSON.stringify({from: f, to: t, date: document.getElementById('date').value}) });
@@ -164,22 +186,18 @@ function renderTrains(trains) {
 }
 
 function setChip(el, sec) {
-    if (!isPremium && sec < 60) {
-        tg.showAlert("15s va 30s intervallar faqat Premium userlar uchun! Sotib olish uchun botga kiring.");
-        return;
-    }
+    if (!isPremium && sec < 60) { openPremiumModal(); return; }
     el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
 }
 
 async function addWatch(num) {
     const iText = document.querySelector(`#int-${num} .active`).innerText.replace('s','').replace('🔒','').trim();
-    const interval = parseInt(iText);
-    const prefs = Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val);
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
         from: document.getElementById('from').value, to: document.getElementById('to').value,
-        date: document.getElementById('date').value, interval, prefs
+        date: document.getElementById('date').value, interval: parseInt(iText),
+        prefs: Array.from(document.querySelectorAll(`#type-${num} .active`)).map(c => c.dataset.val)
     }) });
     const res = await r.json();
     if (res.ok) { tg.showAlert("Kuzatuv yoqildi!"); loadSubs(); } else { tg.showAlert("Xato: " + res.error); }
@@ -190,18 +208,11 @@ async function loadSubs() {
     const r = await fetch(`/api/subs?user_id=${uid}`);
     const d = await r.json();
     isPremium = d.is_premium;
-    
-    // Premium status display
     const pTag = document.getElementById('premium-status');
     if (isPremium) {
         const diff = Math.ceil((new Date(d.premium_until) - new Date()) / (1000 * 60 * 60 * 24));
-        pTag.innerText = `${diff} kun ⭐`;
-        pTag.style.color = '#1a8a50';
-    } else {
-        pTag.innerText = 'Oddiy ⭐';
-        pTag.style.color = '#d4a017';
-    }
-
+        pTag.innerText = `${diff} kun ⭐`; pTag.style.color = '#1a8a50';
+    } else { pTag.innerText = 'Oddiy ⭐'; pTag.style.color = '#d4a017'; }
     const sList = d.subs || [];
     document.getElementById('cnt').innerText = sList.length ? `(${sList.length})` : '';
     const list = document.getElementById('wlist');
@@ -215,6 +226,23 @@ async function loadSubs() {
 async function delSub(id) {
     await fetch('/api/subs/delete', { method: 'POST', body: JSON.stringify({id}) });
     loadSubs();
+}
+
+function openPremiumModal() { document.getElementById('premiumModal').style.display = 'flex'; }
+function closeModal(e) { if (!e || e.target.id === 'premiumModal') document.getElementById('premiumModal').style.display = 'none'; }
+
+async function buyPremium(days) {
+    const r = await fetch('/api/create_invoice', { method: 'POST', body: JSON.stringify({user_id: tg.initDataUnsafe?.user?.id, days}) });
+    const d = await r.json();
+    if (d.ok && d.link) {
+        tg.openInvoice(d.link, (status) => {
+            if (status === 'paid') {
+                tg.showAlert("To'lov muvaffaqiyatli! Premium yoqildi.");
+                closeModal(null);
+                loadSubs();
+            }
+        });
+    } else { tg.showAlert("Xato: " + d.error); }
 }
 
 init();
