@@ -1305,6 +1305,8 @@
             }
         }
 
+        let premiumTimer = null;
+
         async function loadSubs() {
             const uid = tg.initDataUnsafe?.user?.id || 0;
             const r = await fetch(`/api/subs?user_id=${uid}`);
@@ -1313,14 +1315,48 @@
 
             const ps = document.getElementById('p-status');
             if (isPremium) {
-                ps.innerHTML = `<span>Premium: ✅</span> <span>📅 ${d.premium_until}</span>`;
+                if (premiumTimer) clearInterval(premiumTimer);
+                startPremiumCountdown(d.premium_until);
                 ps.style.background = 'linear-gradient(90deg, #34C759 0%, #2EA6FF 100%)';
             } else {
+                if (premiumTimer) clearInterval(premiumTimer);
                 ps.innerHTML = `<span data-i18n="status_oddiy">${i18n('status_oddiy')}</span> <span>⭐ 0</span>`;
                 ps.style.background = 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)';
             }
 
-            const badge = document.getElementById('sub-badge');
+        function startPremiumCountdown(untilStr) {
+            const ps = document.getElementById('p-status');
+            const target = new Date(untilStr.replace(' ', 'T')).getTime();
+
+            function update() {
+                const now = new Date().getTime();
+                const diff = target - now;
+
+                if (diff <= 0) {
+                    ps.innerHTML = `<span data-i18n="status_oddiy">${i18n('status_oddiy')}</span> <span>⭐ 0</span>`;
+                    ps.style.background = 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)';
+                    isPremium = false;
+                    clearInterval(premiumTimer);
+                    return;
+                }
+
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                let timeStr = "";
+                if (days > 0) timeStr += `${days}d `;
+                timeStr += `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                ps.innerHTML = `<span>Premium: ✅</span> <span style="font-family: monospace; font-size: 14px;">⏳ ${timeStr}</span>`;
+            }
+
+            update();
+            premiumTimer = setInterval(update, 1000);
+        }
+
+        const badge = document.getElementById('sub-badge');
             if (d.subs && d.subs.length > 0) {
                 badge.innerText = d.subs.length;
                 badge.style.display = 'block';
