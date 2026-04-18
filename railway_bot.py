@@ -17,14 +17,20 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPri
 import json
 
 # ---- Configuration ----
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+token_raw = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN = token_raw.strip() if token_raw else None
+
+admin_raw = os.getenv("ADMIN_ID", "0")
+try:
+    ADMIN_ID = int(admin_raw.strip())
+except:
+    ADMIN_ID = 0
+
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
 
 if not BOT_TOKEN:
-    logging.error("BOT_TOKEN topilmadi! Railway Variables bo'limini tekshiring.")
-if ADMIN_ID == 0:
-    logging.warning("ADMIN_ID o'rnatilmagan! /users buyrug'i ishlamasligi mumkin.")
+    print("❌ ERROR: BOT_TOKEN topilmadi! Railway Variables bo'limini tekshiring.")
+    exit(1)
 
 async def send_error_to_admin(msg):
     """Xatoliklarni adminga yuborish"""
@@ -292,8 +298,9 @@ async def success_payment_handler(msg: types.Message):
 
 @dp.message(Command("users"))
 async def cmd_admin_users(msg: types.Message):
+    logging.info(f"Admin command call: /users from {msg.from_user.id}")
     if msg.from_user.id != ADMIN_ID:
-        return await msg.answer(f"❌ Kechirasiz, siz admin emassiz.\nSizning ID: `{msg.from_user.id}`\n\nUshbu ID raqamni Railway panelida ADMIN_ID o'zgaruvchisiga yozing.", parse_mode="Markdown")
+        return await msg.answer(f"❌ Siz admin emassiz.\nID: `{msg.from_user.id}`\nAdmin ID: `{ADMIN_ID}`")
     
     users = await db("""
         SELECT u.user_id, u.username, u.premium_until, 
