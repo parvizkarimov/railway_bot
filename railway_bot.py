@@ -398,6 +398,65 @@ async def del_sub(cb: types.CallbackQuery):
     await cb.message.edit_text("✅ Kuzatuv o'chirildi.")
 
 # ---- Checker Logic ----
+# ---- Checker Logic ----
+async def process_subscription(sub, now):
+    sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num = sub
+    logging.info(f"Checking sub {sid} for user {uid} ({f_st}->{t_st}, {s_date}, reys: {s_train_num})")
+    
+    # API so'rovi
+    result = await check_trains(f_code, t_code, s_date)
+    await db("UPDATE subscriptions SET last_checked=? WHERE id=?", (now, sid))
+    
+    if not result:
+        logging.warning(f"Sub {sid}: API dan javob kelmadi")
+        return
+        
+    trains = parse_trains(result)
+    logging.info(f"Sub {sid}: API dan {len(trains)} ta poyezd keldi")
+    
+    if s_train_num:
+        trains = [t for t in trains if str(t.get("number")).strip() == str(s_train_num).strip()]
+        logging.info(f"Sub {sid}: Filtrlashdan so'ng {len(trains)} ta poyezd qoldi")
+    
+    prefs = json.loads(s_prefs)
+    found_text = ""
+    for t in trains:
+        match_cars = []
+        total_train_seats = 0
+        for c in t.get("cars", []):
+            seats = c.get("freeSeats", 0)
+            if seats <= 0: continue
+            price = get_car_price(c)
+            if s_max_p > 0 and price > s_max_p: continue
+            
+            p_types = c.get("placeTypes", [])
+            if not p_types: p_types = get_seat_details(c)
+                
+            if not p_types:
+                match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
+                total_train_seats += seats
+            else:
+                for pt in p_types:
+                    pt_name = pt.get("name", "").lower()
+                    pt_count = pt.get("count", 0)
+                    if pt_count > 0:
+                        if not prefs or pt_name in prefs or (pt_name == "sitting" and c.get("type") == "O'tirish"):
+                            match_cars.append(f"    {format_pt_name(pt_name)}: {pt_count} joy | {price:,} so'm")
+                            total_train_seats += pt_count
+        
+        if match_cars:
+            dep_time = t.get('departureDate', '')
+            arr_time = t.get('arrivalDate', '')
+            found_text += f"✅ <b>{t.get('brand','Poyezd')}</b> — {total_train_seats} joy\n" + "\n".join(match_cars) + f"\n🕐 {dep_time} → {arr_time}\n\n"
+
+    if found_text:
+        logging.info(f"Sub {sid}: Joy topildi! Xabar yuborilmoqda...")
+        msg = f"🔔 <b>Bo'sh joy topildi!</b>\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
+        try: await bot.send_message(uid, msg, parse_mode="HTML")
+        except Exception as e: logging.error(f"Xabar yuborishda xato: {e}")
+    else:
+        logging.info(f"Sub {sid}: Bo'sh joy topilmadi")
+
 async def checker():
     await asyncio.sleep(10)
     while True:
@@ -407,65 +466,15 @@ async def checker():
             subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
             
             for sub in (subs or []):
-                sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num = sub
-                
                 # Muddatni tekshirish
-                if s_date < datetime.now().strftime("%Y-%m-%d"):
-                    await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sid,))
+                if sub[6] < datetime.now().strftime("%Y-%m-%d"):
+                    await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub[0],))
                     continue
-
-                # API so'rovi
-                result = await check_trains(f_code, t_code, s_date)
-                await db("UPDATE subscriptions SET last_checked=? WHERE id=?", (now, sid))
-                
-                if not result: continue
-                trains = parse_trains(result)
-                # Faqat kerakli poyezdni olish
-                if s_train_num:
-                    trains = [t for t in trains if t.get("number") == s_train_num]
-                
-                prefs = json.loads(s_prefs) # ["lower", "upper", "sitting"]
-                
-                found_text = ""
-                for t in trains:
-                    match_cars = []
-                    total_train_seats = 0
-                    for c in t.get("cars", []):
-                        seats = c.get("freeSeats", 0)
-                        if seats <= 0: continue
-                        
-                        price = get_car_price(c)
-                        if s_max_p > 0 and price > s_max_p: continue
-                        
-                        # O'rinlarni placeTypes yoki seatDetail dan olish
-                        p_types = c.get("placeTypes", [])
-                        if not p_types:
-                            p_types = get_seat_details(c)
-                            
-                        if not p_types:
-                            match_cars.append(f"    {c.get('type','?')}: {seats} joy | {price:,} so'm")
-                            total_train_seats += seats
-                        else:
-                            for pt in p_types:
-                                pt_name = pt.get("name", "").lower()
-                                pt_count = pt.get("count", 0)
-                                if pt_count > 0:
-                                    if not prefs or pt_name in prefs or (pt_name == "sitting" and c.get("type") == "O'tirish"):
-                                        match_cars.append(f"    {format_pt_name(pt_name)}: {pt_count} joy | {price:,} so'm")
-                                        total_train_seats += pt_count
-                    
-                    if match_cars:
-                        dep_time = t.get('departureDate', '')
-                        arr_time = t.get('arrivalDate', '')
-                        found_text += f"✅ *{t.get('brand','Poyezd')}* — {total_train_seats} joy\n" + "\n".join(match_cars) + f"\n🕐 {dep_time} → {arr_time}\n\n"
-
-                if found_text:
-                    msg = f"🔔 *Bo'sh joy topildi!*\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
-                    try: await bot.send_message(uid, msg, parse_mode="Markdown")
-                    except: pass
+                await process_subscription(sub, now)
         except Exception as e:
             logging.error(f"Checker error: {e}")
-        await asyncio.sleep(5) # Har 5 soniyada bazani qarab chiqadi
+        await asyncio.sleep(5)
+
 
 # ---- Web Server ----
 async def handle_webapp(request):
@@ -534,12 +543,22 @@ async def handle_add_sub(request):
 
         f_name = next((k for k, v in STATIONS.items() if v == b['from']), b['from'])
         t_name = next((k for k, v in STATIONS.items() if v == b['to']), b['to'])
+        if f_name == t_name:
+            return web.json_response({"ok": False, "error": "Qayerdan va Qayerga bir xil bo'lishi mumkin emas."})
         
         await db("""INSERT INTO subscriptions 
             (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats) 
             VALUES (?,?,?,?,?,?,?,?,?)""", (
             uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', []))
         ))
+        
+        # Yangi ID ni olish va darhol tekshiruvni boshlash
+        last_id = await db("SELECT last_insert_rowid()", fetch=True)
+        if last_id:
+            new_sub = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE id=?", (last_id[0][0],), fetch=True)
+            if new_sub:
+                asyncio.create_task(process_subscription(new_sub[0], int(time.time())))
+
         return web.json_response({"ok": True})
     except Exception as e: return web.json_response({"ok": False, "error": str(e)})
 
