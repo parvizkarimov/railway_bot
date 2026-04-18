@@ -273,7 +273,10 @@ async def admin_reply_handler(message: types.Message):
         
         # Foydalanuvchiga bot orqali yuborish
         user_msg = f"🎧 <b>Support xabari:</b>\n\n{reply_text}"
-        await bot.send_message(target_uid, user_msg, parse_mode="HTML")
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💬 Chatni ochish", web_app=WebAppInfo(url=f"{WEBAPP_URL}#support"))]
+        ])
+        await bot.send_message(target_uid, user_msg, parse_mode="HTML", reply_markup=kb)
         await message.answer(f"✅ Xabar yuborildi (ID: {target_uid})")
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
