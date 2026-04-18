@@ -88,6 +88,13 @@ html, body {
     box-shadow: 0 4px 15px rgba(0,0,0,0.05); cursor: pointer; border: 1px solid rgba(0,0,0,0.03);
 }
 .support-tile.full { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 15px; }
+.support-tile.disabled { opacity: 0.8; cursor: default; position: relative; }
+.badge-soon {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--accent-gold); color: #000;
+    font-size: 10px; font-weight: 800; padding: 2px 6px;
+    border-radius: 6px; text-transform: uppercase;
+}
 .tile-icon {
     width: 45px; height: 45px; background: #f5f5f7; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px;
@@ -419,19 +426,16 @@ html, body {
         </div>
 
         <div class="support-grid">
-            <div class="support-tile" onclick="tg.openTelegramLink('https://t.me/parvizkarimov')">
-                <div class="tile-icon">✈️</div>
-                <div class="tile-label">Telegram</div>
-            </div>
-            <div class="support-tile" onclick="tg.openLink('https://youtube.com')">
-                <div class="tile-icon">📺</div>
-                <div class="tile-label" data-i18n="support_guide">Qo'llanma</div>
-            </div>
             <div class="support-tile" onclick="tg.openTelegramLink('https://t.me/railway_news_uz')">
                 <div class="tile-icon">📢</div>
                 <div class="tile-label" data-i18n="support_news_label">Kanalimiz</div>
             </div>
-            <div class="support-tile" onclick="openChat()">
+            <div class="support-tile disabled" onclick="tg.showAlert(i18n('soon_alert'))">
+                <div class="badge-soon" data-i18n="soon">Tez orada</div>
+                <div class="tile-icon">📺</div>
+                <div class="tile-label" data-i18n="support_guide">Qo'llanma</div>
+            </div>
+            <div class="support-tile full" onclick="openChat()">
                 <div class="tile-icon">💬</div>
                 <div class="tile-label" data-i18n="support_chat_btn">Chat</div>
             </div>
@@ -522,6 +526,7 @@ html, body {
 
 <script>
 const tg = window.Telegram.WebApp;
+let isPremium = false; // Global o'zgaruvchini e'lon qilamiz
 const STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"};
 const translations = {
     uz: {
@@ -589,45 +594,40 @@ const translations = {
     }
 };
 
-translations.uz.support_welcome = "Biror muammoga duch kelsangiz o'zingizga qulay uslubda bizga murojaat qiling!";
-translations.uz.support_guide = "Qo'llanma";
-translations.uz.support_news_label = "Kanalimiz";
-translations.uz.support_chat_btn = "Chat";
-translations.uz.chat_agent = "Support Agent";
-translations.uz.chat_online = "onlayn";
-translations.uz.chat_welcome = "Assalomu alaykum! Sizga qanday yordam bera olaman?";
+translations.uz = { ...translations.uz,
+    nav_support: "Yordam", support_welcome: "Biror muammoga duch kelsangiz o'zingizga qulay uslubda bizga murojaat qiling!",
+    support_guide: "Qo'llanma", support_news_label: "Kanalimiz", support_chat_btn: "Chat",
+    chat_agent: "Support Agent", chat_online: "onlayn", chat_welcome: "Assalomu alaykum! Sizga qanday yordam bera olaman?",
+    support_placeholder: "Xabaringizni yozing...", soon: "Tez orada", soon_alert: "Tez orada qo'llanma qo'shiladi"
+};
 
-translations.uz_cyrl.support_welcome = "Бирор муаммога дуч келсангиз ўзингизга қулай услубда бизga мурожаат қилинг!";
-translations.uz_cyrl.support_guide = "Қўлланма";
-translations.uz_cyrl.support_news_label = "Каналимиз";
-translations.uz_cyrl.support_chat_btn = "Чат";
-translations.uz_cyrl.chat_agent = "Support Агент";
-translations.uz_cyrl.chat_online = "онлайн";
-translations.uz_cyrl.chat_welcome = "Ассалому алайкум! Сизга қanday ёрдам бера оламан?";
+translations.uz_cyrl = { ...translations.uz_cyrl,
+    nav_support: "Ёрдам", support_welcome: "Бирор муаммога дуч келсангиз ўзингизга қулай услубда бизга мурожаат қилинг!",
+    support_guide: "Қўлланма", support_news_label: "Каналимиз", support_chat_btn: "Чат",
+    chat_agent: "Support Агент", chat_online: "онлайн", chat_welcome: "Ассалому алайкум! Сизга қандай ёрдам бера оламан?",
+    support_placeholder: "Хабарингизни ёзинг...", soon: "Тез орада", soon_alert: "Тез орада қўлланма қўшилади"
+};
 
-translations.ru.support_welcome = "Если у вас возникли проблемы, свяжитесь с нами удобным для вас способом!";
-translations.ru.support_guide = "Инструкция";
-translations.ru.support_news_label = "Наш канал";
-translations.ru.support_chat_btn = "Чат";
-translations.ru.chat_agent = "Агент поддержки";
-translations.ru.chat_online = "онлайн";
-translations.ru.chat_welcome = "Здравствуйте! Чем я могу вам помочь?";
+translations.ru = { ...translations.ru,
+    nav_support: "Помощь", support_welcome: "Если у вас возникли проблемы, свяжитесь с нами удобным для вас способом!",
+    support_guide: "Инструкция", support_news_label: "Наш канал", support_chat_btn: "Чат",
+    chat_agent: "Агент поддержки", chat_online: "онлайн", chat_welcome: "Здравствуйте! Чем я могу вам помочь?",
+    support_placeholder: "Напишите ваше сообщение...", soon: "Скоро", soon_alert: "Скоро будет добавлена инструкция"
+};
 
-translations.en.support_welcome = "If you encounter any problems, please contact us in a way that is convenient for you!";
-translations.en.support_guide = "Guide";
-translations.en.support_news_label = "Our Channel";
-translations.en.support_chat_btn = "Chat";
-translations.en.chat_agent = "Support Agent";
-translations.en.chat_online = "online";
-translations.en.chat_welcome = "Hello! How can I help you today?";
+translations.en = { ...translations.en,
+    nav_support: "Support", support_welcome: "If you encounter any problems, please contact us in a way that is convenient for you!",
+    support_guide: "Guide", support_news_label: "Our Channel", support_chat_btn: "Chat",
+    chat_agent: "Support Agent", chat_online: "online", chat_welcome: "Hello! How can I help you today?",
+    support_placeholder: "Type your message...", soon: "Soon", soon_alert: "Guide will be added soon"
+};
 
-translations.kaa.support_welcome = "Biror muammoǵa dush kelseńiz ózińizge qolay usılda bizge múrájat qılıń!";
-translations.kaa.support_guide = "Qollanba";
-translations.kaa.support_news_label = "Kanalımız";
-translations.kaa.support_chat_btn = "Chat";
-translations.kaa.chat_agent = "Járdem Agentı";
-translations.kaa.chat_online = "onlayn";
-translations.kaa.chat_welcome = "Assalawma áleykum! Sizge qanday járdem bere alaman?";
+translations.kaa = { ...translations.kaa,
+    nav_support: "Járdem", support_welcome: "Biror muammoǵa dush kelseńiz ózińizge qolay usılda bizge múrájat qılıń!",
+    support_guide: "Qollanba", support_news_label: "Kanalımız", support_chat_btn: "Chat",
+    chat_agent: "Járdem Agentı", chat_online: "onlayn", chat_welcome: "Assalawma áleykum! Sizge qanday járdem bere alaman?",
+    support_placeholder: "Xabarıńızdı jazıń...", soon: "Tez arada", soon_alert: "Tez arada qollanba qosıladı"
+};
 
 const langLabels = {
     uz: "🇺🇿 UZ",
@@ -678,21 +678,30 @@ function init() {
     tg.expand();
     tg.ready();
     
-    // Ba'zi iOS qurilmalarda qayta chaqirish kerak
     setInterval(() => tg.expand(), 1000);
 
+    const f = document.getElementById('from'), t = document.getElementById('to');
+    if (f && t) {
+        f.innerHTML = ""; t.innerHTML = "";
+        Object.keys(STATIONS).forEach(n => {
+            f.add(new Option(n, STATIONS[n], n === 'Toshkent', n === 'Toshkent'));
+            t.add(new Option(n, STATIONS[n], n === 'Samarqand', n === 'Samarqand'));
+        });
+    }
+    
+    const dateInput = document.getElementById('date');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
     setTimeout(() => {
-        setLanguage(currentLang);
+        try {
+            setLanguage(currentLang);
+        } catch(e) { console.error("Lang error", e); }
         window.scrollTo(0, 0);
     }, 100);
-    
-    const f = document.getElementById('from'), t = document.getElementById('to');
-    Object.keys(STATIONS).forEach(n => {
-        f.innerHTML += `<option value="${STATIONS[n]}" ${n==='Toshkent'?'selected':''}>${n}</option>`;
-        t.innerHTML += `<option value="${STATIONS[n]}" ${n==='Samarqand'?'selected':''}>${n}</option>`;
-    });
-    document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    loadSubs();
+
+    try {
+        loadSubs();
+    } catch(e) { console.error("Subs error", e); }
 }
 
 function navTo(id, el) {
@@ -886,29 +895,50 @@ async function buyPremium(days) {
     }
 }
 
+let chatInterval = null;
+
 function openChat() { 
     document.getElementById('chat-view').style.display = 'flex'; 
-    window.scrollTo(0,0);
+    loadChatHistory();
+    // Har 5 soniyada xabarlarni yangilab turish
+    if (chatInterval) clearInterval(chatInterval);
+    chatInterval = setInterval(loadChatHistory, 5000);
 }
-function closeChat() { document.getElementById('chat-view').style.display = 'none'; }
+function closeChat() { 
+    document.getElementById('chat-view').style.display = 'none'; 
+    if (chatInterval) clearInterval(chatInterval);
+}
+
+async function loadChatHistory() {
+    const uid = tg.initDataUnsafe?.user?.id || 0;
+    try {
+        const r = await fetch(`/api/support/messages?user_id=${uid}`);
+        const d = await r.json();
+        if (d.ok) {
+            const chatMsgs = document.getElementById('chat-msgs');
+            const wasScrolledBottom = chatMsgs.scrollHeight - chatMsgs.clientHeight <= chatMsgs.scrollTop + 10;
+            
+            chatMsgs.innerHTML = d.messages.map(m => {
+                const time = m.time ? m.time.split(' ')[1].substring(0,5) : '--:--';
+                return `
+                <div class="msg ${m.sender}">
+                    ${m.text}
+                    <div class="msg-time">${time}</div>
+                </div>`;
+            }).join('');
+            
+            if (wasScrolledBottom) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+        }
+    } catch(e) {}
+}
 
 async function sendLiveMessage() {
     const input = document.getElementById('chat-input-field');
     const msg = input.value.trim();
     if (!msg) return;
 
-    // UI da xabarni ko'rsatish
-    const chatMsgs = document.getElementById('chat-msgs');
-    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    chatMsgs.innerHTML += `
-        <div class="msg user">
-            ${msg}
-            <div class="msg-time">${time}</div>
-        </div>
-    `;
     input.value = "";
-    chatMsgs.scrollTop = chatMsgs.scrollHeight;
-
+    
     // Serverga yuborish
     try {
         await fetch('/api/support', { 
@@ -920,6 +950,7 @@ async function sendLiveMessage() {
                 message: msg
             }) 
         });
+        loadChatHistory();
     } catch(e) {}
 }
 

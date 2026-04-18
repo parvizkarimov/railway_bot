@@ -82,7 +82,14 @@ async def refresh_cookie():
                 _cookie_cache["cookie"] = cookie_str
                 _cookie_cache["xsrf"] = xsrf
                 _cookie_cache["updated"] = datetime.now()
-                logging.info(f"Cookie yangilandi")
+                await db("""CREATE TABLE IF NOT EXISTS support_chat (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        sender TEXT, -- 'user' yoki 'admin'
+        message TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    logging.info("Ma'lumotlar bazasi tayyor.")
                 return True
             else:
                 await send_error_to_admin("Cookie yoki XSRF token olinmadi. Sayt strukturasi o'zgargan bo'lishi mumkin.")
@@ -242,6 +249,26 @@ async def db(query, params=(), fetch=False):
 # ---- Bot ----
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+
+@dp.message(F.reply_to_message & (F.from_user.id == ADMIN_ID))
+async def admin_reply_handler(message: types.Message):
+    orig = message.reply_to_message.text or message.reply_to_message.caption
+    if not orig or "🆔 ID:" not in orig: return
+    
+    try:
+        # ID ni xabardan ajratib olish
+        target_uid = int(orig.split("🆔 ID:")[1].split("\n")[0].strip())
+        reply_text = message.text
+        
+        # Bazaga saqlash
+        await db("INSERT INTO support_chat (user_id, sender, message) VALUES (?, 'admin', ?)", (target_uid, reply_text))
+        
+        # Foydalanuvchiga bot orqali yuborish
+        user_msg = f"🎧 <b>Support xabari:</b>\n\n{reply_text}"
+        await bot.send_message(target_uid, user_msg, parse_mode="HTML")
+        await message.answer(f"✅ Xabar yuborildi (ID: {target_uid})")
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}")
 
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
@@ -643,6 +670,7 @@ async def start_webserver():
     app.router.add_post("/api/subs/update", handle_update_sub)
     app.router.add_post("/api/create_invoice", handle_create_invoice)
     app.router.add_post("/api/support", handle_support_api)
+    app.router.add_get("/api/support/messages", handle_get_chat_api)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
@@ -655,17 +683,29 @@ async def handle_support_api(request):
         username = body.get("username", "")
         msg = body.get("message")
         
+        # Bazaga saqlash
+        await db("INSERT INTO support_chat (user_id, sender, message) VALUES (?, 'user', ?)", (uid, msg))
+        
         admin_msg = f"🎧 <b>Yangi Support xabari!</b>\n\n" \
                     f"👤 <b>Kimdan:</b> {name} (@{username})\n" \
-                    f"🆔 <b>ID:</b> {uid}\n\n" \
-                    f"📝 <b>Xabar:</b>\n{msg}"
+                    f"🆔 <b>ID:</b> <code>{uid}</code>\n\n" \
+                    f"📝 <b>Xabar:</b>\n{msg}\n\n" \
+                    f"<i>Javob berish uchun ushbu xabarga 'Reply' qiling.</i>"
         
         try:
             await bot.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
             return web.json_response({"ok": True})
         except Exception as e:
-            logging.error(f"Admin xabar yuborishda xato: {e}")
             return web.json_response({"ok": False, "error": "Admin xabar qabul qila olmadi"})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
+async def handle_get_chat_api(request):
+    try:
+        uid = request.query.get("user_id")
+        rows = await db("SELECT sender, message, timestamp FROM support_chat WHERE user_id=? ORDER BY id ASC", (uid,), fetch=True)
+        msgs = [{"sender": r[0], "text": r[1], "time": r[2]} for r in rows]
+        return web.json_response({"ok": True, "messages": msgs})
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)})
 
