@@ -2,7 +2,7 @@
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Temir Yo'l Chiptalari</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -27,7 +27,8 @@ body {
     background: var(--tg-bg); 
     color: var(--tg-text); 
     overflow-x: hidden;
-    padding-bottom: 90px; /* Space for bottom nav */
+    padding-bottom: 90px; 
+    touch-action: manipulation; /* iOS zoomni oldini oladi */
 }
 
 .app { max-width: 480px; margin: 0 auto; padding: 16px; }
