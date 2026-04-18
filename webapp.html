@@ -426,12 +426,12 @@ html, body {
         </div>
 
         <div class="support-grid">
-            <div class="support-item disabled" onclick="tg.showAlert(i18n('soon_alert_channel'))">
-                <div class="support-soon" data-i18n="soon">Tez orada</div>
-                <div class="support-icon">📢</div>
-                <div class="support-label" data-i18n="support_news_label">Kanalimiz</div>
+            <div class="support-tile disabled">
+                <div class="badge-soon" data-i18n="soon">Tez orada</div>
+                <div class="tile-icon">📢</div>
+                <div class="tile-label" data-i18n="support_news_label">Kanalimiz</div>
             </div>
-            <div class="support-tile disabled" onclick="tg.showAlert(i18n('soon_alert'))">
+            <div class="support-tile disabled">
                 <div class="badge-soon" data-i18n="soon">Tez orada</div>
                 <div class="tile-icon">📺</div>
                 <div class="tile-label" data-i18n="support_guide">Qo'llanma</div>
@@ -481,7 +481,6 @@ html, body {
         </div>
     </div>
     <div class="chat-input-bar">
-        <span style="font-size: 20px; opacity: 0.5;">📎</span>
         <input type="text" id="chat-input-field" class="chat-input" data-i18n-placeholder="support_placeholder" placeholder="Xabarni yozing...">
         <div class="chat-send-btn" onclick="sendLiveMessage()">➡️</div>
     </div>
