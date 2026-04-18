@@ -1,6 +1,8 @@
 from urllib.parse import unquote
 import asyncio
 import aiohttp
+import random
+from playwright.async_api import async_playwright
 import aiosqlite
 import logging
 import os
@@ -73,45 +75,94 @@ async def cookie_refresher():
         await asyncio.sleep(1200) # 20 daqiqa
 
 async def refresh_cookie():
-    """Playwright orqali yangi cookie olish"""
-    try:
-        from playwright.async_api import async_playwright
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=[
-                "--no-sandbox", 
-                "--disable-dev-shm-usage",
-                "--disable-setuid-sandbox",
-                "--no-first-run",
-                "--no-zygote",
-                "--single-process" # RAM tejash uchun
-            ])
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            )
-            page = await context.new_page()
-            # Timeoutni 60 soniyaga oshiramiz
-            await page.goto("https://eticket.railway.uz/uz/pages/trains-page", wait_until="networkidle", timeout=60000)
-            await asyncio.sleep(5) # Sahifa to'liq yuklanishi uchun kutiladi
-            
-            cookies = await context.cookies()
-            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
-            xsrf = unquote(next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), ""))
-            await browser.close()
-            if cookie_str and xsrf:
-                _cookie_cache["cookie"] = cookie_str
-                _cookie_cache["xsrf"] = xsrf
-                _cookie_cache["updated"] = datetime.now()
-                logging.info("Cookie yangilandi.")
-                return True
-            else:
-                await send_error_to_admin("Cookie yoki XSRF token olinmadi. Sayt strukturasi o'zgargan bo'lishi mumkin.")
-    except Exception as e:
-        err_msg = str(e)
-        logging.error(f"Playwright xato: {err_msg}")
-        if "timeout" in err_msg.lower():
-            await send_error_to_admin("Playwright timeout: Sayt juda sekin ishlayapti yoki IP bloklangan bo'lishi mumkin.")
-        else:
-            await send_error_to_admin(f"Playwright orqali cookie olishda xato: {err_msg}")
+    """Playwright orqali yangi cookie olish (Optimallashtirilgan)"""
+    for attempt in range(1, 4):
+        browser = None
+        try:
+            logging.info(f"Cookie yangilash urinishi: {attempt}")
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True, args=[
+                    "--no-sandbox", 
+                    "--disable-dev-shm-usage",
+                    "--disable-setuid-sandbox",
+                    "--disable-blink-features=AutomationControlled", # Anti-bot bypass
+                    "--no-first-run",
+                    "--no-zygote",
+                    "--single-process"
+                ])
+                
+                # Turli xil User-Agentlar
+                user_agents = [
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ]
+                
+                context = await browser.new_context(
+                    user_agent=random.choice(user_agents),
+                    viewport={'width': 1280, 'height': 720}
+                )
+                page = await context.new_page()
+                
+                # Sarlavhalarni qo'shish
+                await page.set_extra_http_headers({
+                    "Accept-Language": "uz-UZ,uz;q=0.9,ru;q=0.8,en;q=0.7",
+                    "Upgrade-Insecure-Requests": "1"
+                })
+
+                # Timeoutni bo'lib ishlatamiz. networkidle o'rniga domcontentloaded va keyin kutish
+                try:
+                    response = await page.goto("https://eticket.railway.uz/uz/pages/trains-page", 
+                                             wait_until="domcontentloaded", 
+                                             timeout=40000)
+                    
+                    if response and response.status == 403:
+                        logging.warning(f"Urinish {attempt}: 403 Forbidden. IP bloklangan bo'lishi mumkin.")
+                        if attempt == 3:
+                            await send_error_to_admin("Playwright: 403 Forbidden (Blok). IP manzilingiz Railway tomonidan bloklangan.")
+                        await browser.close()
+                        await asyncio.sleep(random.uniform(5, 10))
+                        continue
+
+                    # Sahifa yuklanishini biroz kutamiz (networkidle har doim ham ishlamasligi mumkin)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                    except:
+                        logging.warning(f"Urinish {attempt}: Networkidle timeout, lekin davom etamiz...")
+
+                except Exception as e:
+                    logging.error(f"Urinish {attempt} goto xato: {e}")
+                    await browser.close()
+                    await asyncio.sleep(2)
+                    continue
+
+                await asyncio.sleep(random.uniform(3, 7)) # Real userdek kutish
+                
+                cookies = await context.cookies()
+                cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
+                xsrf = unquote(next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), ""))
+                
+                await browser.close()
+
+                if cookie_str and xsrf:
+                    _cookie_cache["cookie"] = cookie_str
+                    _cookie_cache["xsrf"] = xsrf
+                    _cookie_cache["updated"] = datetime.now()
+                    logging.info(f"Cookie muvaffaqiyatli yangilandi (Urinish {attempt})")
+                    return True
+                else:
+                    logging.warning(f"Urinish {attempt}: Cookie yoki XSRF topilmadi.")
+                    if attempt == 3:
+                        await send_error_to_admin("Cookie yoki XSRF token olinmadi. Sayt strukturasi o'zgargan bo'lishi mumkin.")
+                    await asyncio.sleep(2)
+                    
+        except Exception as e:
+            logging.error(f"Playwright fatal error (Urinish {attempt}): {e}")
+            if browser:
+                try: await browser.close()
+                except: pass
+            await asyncio.sleep(2)
+
     return False
 
 async def get_cookie(force=False):
