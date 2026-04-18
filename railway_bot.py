@@ -472,18 +472,30 @@ async def process_subscription(sub, now):
 
 async def checker():
     await asyncio.sleep(10)
+    # Bir vaqtning o'zida ko'p so'rov yubormaslik uchun limit (semaphore)
+    sem = asyncio.Semaphore(3) 
+
+    async def throttled_process(sub, now):
+        async with sem:
+            await process_subscription(sub, now)
+
     while True:
         try:
             now = int(time.time())
-            # Faqat vaqti kelgan va faol kuzatuvlarni olish
             subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
             
-            for sub in (subs or []):
-                # Muddatni tekshirish
-                if sub[6] < datetime.now().strftime("%Y-%m-%d"):
-                    await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub[0],))
-                    continue
-                await process_subscription(sub, now)
+            if subs:
+                tasks = []
+                for sub in subs:
+                    # Muddatni tekshirish
+                    if sub[6] < datetime.now().strftime("%Y-%m-%d"):
+                        await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub[0],))
+                        continue
+                    tasks.append(throttled_process(sub, now))
+                
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    
         except Exception as e:
             logging.error(f"Checker error: {e}")
         await asyncio.sleep(5)

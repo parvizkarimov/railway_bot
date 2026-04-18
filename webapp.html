@@ -448,8 +448,8 @@ function renderTrains(trains) {
             <div class="chip-group">
                 <span class="form-label">Interval</span>
                 <div class="chips" id="int-${t.number}">
-                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s 🔒</span>
-                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s 🔒</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s${!isPremium?' 🔒':''}</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s${!isPremium?' 🔒':''}</span>
                     <span class="chip active" onclick="setChip(this,60)">60s</span>
                 </div>
             </div>
