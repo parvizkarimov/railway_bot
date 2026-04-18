@@ -387,6 +387,38 @@ async def cmd_admin_users(msg: types.Message):
         
     await msg.answer(text, parse_mode="HTML")
 
+@dp.message(Command("send"))
+async def cmd_broadcast(msg: types.Message):
+    """Barcha foydalanuvchilarga xabar yuborish (Faqat Admin)"""
+    if msg.from_user.id != ADMIN_ID:
+        return
+    
+    # Buyruqdan keyingi matnni olish: /send Matn...
+    text = msg.text.replace("/send", "", 1).strip()
+    if not text:
+        return await msg.answer("❌ Xabar matnini yozing. Masalan: `/send Salom barchaga!`", parse_mode="Markdown")
+    
+    users = await db("SELECT user_id FROM users", fetch=True)
+    if not users:
+        return await msg.answer("Foydalanuvchilar topilmadi.")
+    
+    count = 0
+    errors = 0
+    status_msg = await msg.answer(f"⏳ Xabar yuborilmoqda... (Jami: {len(users)})")
+    
+    for user in users:
+        try:
+            await bot.send_message(user[0], text, parse_mode="HTML")
+            count += 1
+            # Bot bloklanib qolmasligi uchun kichik pauza (har 20 xabarda)
+            if count % 20 == 0:
+                await asyncio.sleep(0.5)
+        except Exception as e:
+            errors += 1
+            logging.error(f"Broadcast error for {user[0]}: {e}")
+            
+    await status_msg.edit_text(f"✅ Xabar yuborildi!\n\n🚀 Muvaffaqiyatli: {count}\n❌ Xatolik (bloklaganlar): {errors}")
+
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
     try: await cb.answer()
