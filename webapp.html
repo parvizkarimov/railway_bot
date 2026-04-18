@@ -675,33 +675,35 @@ tg.ready();
 tg.isVerticalSwipesEnabled = false;
 
 function init() {
+    // 1. Shaharlar va sanani yuklash (Eng muhimi)
+    try {
+        const f = document.getElementById('from'), t = document.getElementById('to');
+        if (f && t) {
+            f.innerHTML = ""; t.innerHTML = "";
+            for (const n in STATIONS) {
+                f.add(new Option(n, STATIONS[n], n === 'Toshkent', n === 'Toshkent'));
+                t.add(new Option(n, STATIONS[n], n === 'Samarqand', n === 'Samarqand'));
+            }
+        }
+        const dateInput = document.getElementById('date');
+        if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    } catch(e) { console.error("Init Error:", e); }
+
+    // 2. Telegram WebApp sozlamalari
     tg.expand();
     tg.ready();
-    
     setInterval(() => tg.expand(), 1000);
 
-    const f = document.getElementById('from'), t = document.getElementById('to');
-    if (f && t) {
-        f.innerHTML = ""; t.innerHTML = "";
-        Object.keys(STATIONS).forEach(n => {
-            f.add(new Option(n, STATIONS[n], n === 'Toshkent', n === 'Toshkent'));
-            t.add(new Option(n, STATIONS[n], n === 'Samarqand', n === 'Samarqand'));
-        });
-    }
-    
-    const dateInput = document.getElementById('date');
-    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
-
+    // 3. Til va Obunalar (Kechiktirilgan)
     setTimeout(() => {
         try {
             setLanguage(currentLang);
-        } catch(e) { console.error("Lang error", e); }
+        } catch(e) { console.error("Lang Error:", e); }
+        try {
+            loadSubs();
+        } catch(e) { console.error("Subs Error:", e); }
         window.scrollTo(0, 0);
     }, 100);
-
-    try {
-        loadSubs();
-    } catch(e) { console.error("Subs error", e); }
 }
 
 function navTo(id, el) {

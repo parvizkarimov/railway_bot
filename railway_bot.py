@@ -43,6 +43,8 @@ async def send_error_to_admin(msg):
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
 COOKIE_TTL = 1500  # 25 daqiqa
 
+STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"}
+
 async def cookie_refresher():
     """Orqa fonda cookielarni har 20 minutda yangilab turish"""
     while True:
