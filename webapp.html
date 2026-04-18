@@ -22,16 +22,28 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-body { 
+html, body { 
     font-family: 'Outfit', sans-serif; 
     background: var(--tg-bg); 
     color: var(--tg-text); 
-    overflow-x: hidden;
-    padding-bottom: 90px; 
-    touch-action: manipulation; /* iOS zoomni oldini oladi */
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
 }
 
-.app { max-width: 480px; margin: 0 auto; padding: 16px; }
+.app { 
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px 100px 16px;
+}
+
+.app-container { max-width: 480px; margin: 0 auto; }
 
 /* Language Switcher */
 .lang-switcher {
@@ -299,7 +311,8 @@ body {
 <body>
 
 <div class="app">
-    <!-- Header -->
+    <div class="app-container">
+        <!-- Header -->
     <div class="header-glass">
         <div class="lang-switcher">
             <button class="lang-btn" onclick="toggleLang()">🌐 <span id="current-lang">UZ</span></button>
@@ -375,7 +388,8 @@ body {
             <button class="btn-main" onclick="openPremiumModal()" data-i18n="buy_btn">Sotib olish</button>
         </div>
     </div>
-</div>
+    </div> <!-- app-container end -->
+</div> <!-- app end -->
 
 <!-- Bottom Navigation -->
 <div class="bottom-nav">
@@ -523,7 +537,12 @@ function i18n(key) {
 function init() {
     tg.expand();
     tg.ready();
-    setTimeout(() => setLanguage(currentLang), 100);
+    tg.isVerticalSwipesEnabled = false; // iOSda pastga tortib yopishni o'chiradi
+    
+    setTimeout(() => {
+        setLanguage(currentLang);
+        window.scrollTo(0, 1); // Brauzer panelini yashirishga yordam beradi
+    }, 100);
     
     const f = document.getElementById('from'), t = document.getElementById('to');
     Object.keys(STATIONS).forEach(n => {
