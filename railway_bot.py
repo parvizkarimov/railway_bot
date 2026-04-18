@@ -195,11 +195,15 @@ async def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER, from_st TEXT, to_st TEXT,
             from_code TEXT, to_code TEXT, date TEXT, 
+            train_num TEXT,
             check_interval INTEGER DEFAULT 300,
             preferred_seats TEXT DEFAULT '[]',
             max_price INTEGER DEFAULT 0,
             last_checked INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1)""")
+        # Eski bazalarni yangilash (agar train_num bo'lmasa)
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN train_num TEXT");
+        except: pass
         await conn.commit()
 
 async def db(query, params=(), fetch=False):
@@ -381,10 +385,10 @@ async def checker():
         try:
             now = int(time.time())
             # Faqat vaqti kelgan va faol kuzatuvlarni olish
-            subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
+            subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
             
             for sub in (subs or []):
-                sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p = sub
+                sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num = sub
                 
                 # Muddatni tekshirish
                 if s_date < datetime.now().strftime("%Y-%m-%d"):
@@ -397,6 +401,10 @@ async def checker():
                 
                 if not result: continue
                 trains = parse_trains(result)
+                # Faqat kerakli poyezdni olish
+                if s_train_num:
+                    trains = [t for t in trains if t.get("number") == s_train_num]
+                
                 prefs = json.loads(s_prefs) # ["lower", "upper", "sitting"]
                 
                 found_text = ""
@@ -507,12 +515,12 @@ async def handle_add_sub(request):
 
         f_name = next((k for k, v in STATIONS.items() if v == b['from']), b['from'])
         t_name = next((k for k, v in STATIONS.items() if v == b['to']), b['to'])
-        if f_name == t_name:
-            return web.json_response({"ok": False, "error": "Qayerdan va Qayerga bir xil bo'lishi mumkin emas."})
-
-        prefs = json.dumps(b.get("prefs", []))
-        await db("INSERT INTO subscriptions (user_id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price) VALUES (?,?,?,?,?,?,?,?,?)",
-           (uid, f_name, t_name, b['from'], b['to'], b['date'], int(b.get('interval', 300)), prefs, int(b.get('max_price', 0))))
+        
+        await db("""INSERT INTO subscriptions 
+            (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats) 
+            VALUES (?,?,?,?,?,?,?,?,?)""", (
+            uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', []))
+        ))
         return web.json_response({"ok": True})
     except Exception as e: return web.json_response({"ok": False, "error": str(e)})
 
