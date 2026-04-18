@@ -18,7 +18,7 @@ import json
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "7388718131:AAEUW-R9v0jI3uXN-Y8H0wW0xX0yZ0a1b2c")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "474681690"))
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://railwaybot-production.up.railway.app")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 
 async def send_error_to_admin(msg):
     """Xatoliklarni adminga yuborish"""
@@ -289,7 +289,7 @@ async def success_payment_handler(msg: types.Message):
 @dp.message(Command("users"))
 async def cmd_admin_users(msg: types.Message):
     if msg.from_user.id != ADMIN_ID:
-        return
+        return await msg.answer(f"❌ Kechirasiz, siz admin emassiz.\nSizning ID: `{msg.from_user.id}`\n\nUshbu ID raqamni Railway panelida ADMIN_ID o'zgaruvchisiga yozing.", parse_mode="Markdown")
     
     users = await db("""
         SELECT u.user_id, u.username, u.premium_until, 
