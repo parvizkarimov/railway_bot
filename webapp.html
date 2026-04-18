@@ -426,9 +426,10 @@ html, body {
         </div>
 
         <div class="support-grid">
-            <div class="support-tile" onclick="tg.openTelegramLink('https://t.me/railway_news_uz')">
-                <div class="tile-icon">📢</div>
-                <div class="tile-label" data-i18n="support_news_label">Kanalimiz</div>
+            <div class="support-item disabled" onclick="tg.showAlert(i18n('soon_alert_channel'))">
+                <div class="support-soon" data-i18n="soon">Tez orada</div>
+                <div class="support-icon">📢</div>
+                <div class="support-label" data-i18n="support_news_label">Kanalimiz</div>
             </div>
             <div class="support-tile disabled" onclick="tg.showAlert(i18n('soon_alert'))">
                 <div class="badge-soon" data-i18n="soon">Tez orada</div>
@@ -586,11 +587,23 @@ const translations = {
         buy_btn: "Buy Now", modal_title: "Choose Premium", plan_1: "1 day", plan_5: "5 days", plan_10: "10 days", close_btn: "Close"
     },
     kaa: {
-        ...translations.kaa,
+        app_title: "Railway Bot", app_subtitle: "Tezkor bilet baqlaw sisteması",
+        from: "QAYERDEN", to: "QAYERGE", departure_date: "KETIW SÁNESI",
+        search_btn: "🔍 Izlew", nav_search: "Izlew", nav_kuzatuv: "Baqlaw", nav_stars: "Stars", nav_support: "Járdem",
+        no_trains: "Poyezd tabılmadı.", no_tickets: "Biletler qalmaǵan",
+        lower: "Tómengi", upper: "Joqarǵı", sitting: "Otırıw", price_suffix: "som",
+        start_monitor: "Baqlawdı qosıw", monitoring_title: "Aktiv baqlawlar",
+        empty_monitor: "Ele baqlawlar joq.", delete: "Óshiriw",
+        wait: "Kutilmekte...", loading: "Izlenbekte...",
+        added: "Qosıldı!", interval: "Interval",
+        locked: "Premium jazılıw talap etiledi.", status_oddiy: "Holatı: Oddiy",
+        premium_title: "Premium Abzallıqları", premium_desc: "• Tezkor baqlaw (15s, 30s)<br>• Sheksiz baqlawlar sanı<br>• Birinshilerden bolıp xabar alıw",
+        buy_btn: "Satıp alıw", modal_title: "Premium Saylań", plan_1: "1 kúnlik", plan_5: "5 kúnlik", plan_10: "10 kúnlik", close_btn: "Jabıw",
         support_welcome: "Biror muammoǵa dush kelseńiz ózińizge qolay usılda bizge múrájat qılıń!",
         support_guide: "Qollanba", support_news_label: "Kanalımız", support_chat_btn: "Chat",
         chat_agent: "Járdem Agentı", chat_online: "onlayn", chat_welcome: "Assalawma áleykum! Sizge qanday járdem bere alaman?",
-        support_placeholder: "Xabarıńızdı jazıń...", send_btn: "Jiberiw", support_sent: "Xabar jiberildi!", support_error: "Xatolik yuz berdi"
+        support_placeholder: "Xabarıńızdı jazıń...", send_btn: "Jiberiw", support_sent: "Xabar jiberildi!", support_error: "Xatolik yuz berdi",
+        soon: "Tez arada", soon_alert: "Tez arada qollanba qosıladı"
     }
 };
 
@@ -598,35 +611,35 @@ translations.uz = { ...translations.uz,
     nav_support: "Yordam", support_welcome: "Biror muammoga duch kelsangiz o'zingizga qulay uslubda bizga murojaat qiling!",
     support_guide: "Qo'llanma", support_news_label: "Kanalimiz", support_chat_btn: "Chat",
     chat_agent: "Support Agent", chat_online: "onlayn", chat_welcome: "Assalomu alaykum! Sizga qanday yordam bera olaman?",
-    support_placeholder: "Xabaringizni yozing...", soon: "Tez orada", soon_alert: "Tez orada qo'llanma qo'shiladi"
+    support_placeholder: "Xabaringizni yozing...", soon: "Tez orada", soon_alert: "Tez orada qo'llanma qo'shiladi", soon_alert_channel: "Tez orada kanalimiz ishga tushadi"
 };
 
 translations.uz_cyrl = { ...translations.uz_cyrl,
     nav_support: "Ёрдам", support_welcome: "Бирор муаммога дуч келсангиз ўзингизга қулай услубда бизга мурожаат қилинг!",
     support_guide: "Қўлланма", support_news_label: "Каналимиз", support_chat_btn: "Чат",
     chat_agent: "Support Агент", chat_online: "онлайн", chat_welcome: "Ассалому алайкум! Сизга қандай ёрдам бера оламан?",
-    support_placeholder: "Хабарингизни ёзинг...", soon: "Тез орада", soon_alert: "Тез орада қўлланма қўшилади"
+    support_placeholder: "Хабарингизни ёзинг...", soon: "Тез орада", soon_alert: "Тез орада қўлланма қўшилади", soon_alert_channel: "Тез орада каналимиз ишga тушади"
 };
 
 translations.ru = { ...translations.ru,
     nav_support: "Помощь", support_welcome: "Если у вас возникли проблемы, свяжитесь с нами удобным для вас способом!",
     support_guide: "Инструкция", support_news_label: "Наш канал", support_chat_btn: "Чат",
     chat_agent: "Агент поддержки", chat_online: "онлайн", chat_welcome: "Здравствуйте! Чем я могу вам помочь?",
-    support_placeholder: "Напишите ваше сообщение...", soon: "Скоро", soon_alert: "Скоро будет добавлена инструкция"
+    support_placeholder: "Напишите ваше сообщение...", soon: "Скоро", soon_alert: "Скоро будет добавлена инструкция", soon_alert_channel: "Скоро наш канал будет запущен"
 };
 
 translations.en = { ...translations.en,
     nav_support: "Support", support_welcome: "If you encounter any problems, please contact us in a way that is convenient for you!",
     support_guide: "Guide", support_news_label: "Our Channel", support_chat_btn: "Chat",
     chat_agent: "Support Agent", chat_online: "online", chat_welcome: "Hello! How can I help you today?",
-    support_placeholder: "Type your message...", soon: "Soon", soon_alert: "Guide will be added soon"
+    support_placeholder: "Type your message...", soon: "Soon", soon_alert: "Guide will be added soon", soon_alert_channel: "Our channel will be launched soon"
 };
 
 translations.kaa = { ...translations.kaa,
     nav_support: "Járdem", support_welcome: "Biror muammoǵa dush kelseńiz ózińizge qolay usılda bizge múrájat qılıń!",
     support_guide: "Qollanba", support_news_label: "Kanalımız", support_chat_btn: "Chat",
     chat_agent: "Járdem Agentı", chat_online: "onlayn", chat_welcome: "Assalawma áleykum! Sizge qanday járdem bere alaman?",
-    support_placeholder: "Xabarıńızdı jazıń...", soon: "Tez arada", soon_alert: "Tez arada qollanba qosıladı"
+    support_placeholder: "Xabarıńızdı jazıń...", soon: "Tez arada", soon_alert: "Tez arada qollanba qosıladı", soon_alert_channel: "Tez arada kanalımız iske túsedi"
 };
 
 const langLabels = {
