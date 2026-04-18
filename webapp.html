@@ -80,6 +80,14 @@ html, body {
 }
 .lang-dropdown.show { display: block; }
 
+.support-chat-area { margin-top: 20px; text-align: left; }
+.support-input {
+    width: 100%; height: 100px; padding: 12px; border-radius: 12px;
+    background: var(--tg-bg); color: var(--tg-text); border: 1px solid rgba(0,0,0,0.1);
+    font-family: inherit; font-size: 14px; resize: none; margin-bottom: 10px;
+}
+.support-input:focus { border-color: var(--tg-btn); outline: none; }
+
 .header-glass {
     background: linear-gradient(135deg, rgba(46, 166, 255, 0.1), rgba(46, 166, 255, 0.05));
     border-radius: 24px;
@@ -370,6 +378,25 @@ html, body {
         <div id="wlist"></div>
     </div>
 
+    <!-- Support Section -->
+    <div id="support-section" class="section">
+        <div class="glass-card" style="text-align: center;">
+            <span style="font-size: 50px;">🎧</span>
+            <h2 style="margin: 10px 0;" data-i18n="support_title">Yordam markazi</h2>
+            <p style="opacity: 0.6; font-size: 14px; margin-bottom: 20px;" data-i18n="support_desc">Savollaringiz bo'lsa bizga yozing</p>
+            
+            <div class="support-chat-area">
+                <textarea id="support-msg" class="support-input" data-i18n-placeholder="support_placeholder" placeholder="Xabaringizni yozing..."></textarea>
+                <button class="btn-main" onclick="sendSupportMessage()" id="support-send-btn" data-i18n="send_btn">Yuborish</button>
+            </div>
+
+            <div style="margin-top: 25px; display: flex; gap: 10px;">
+                <button class="btn-main" onclick="tg.openTelegramLink('https://t.me/parvizkarimov')" data-i18n="support_chat" style="font-size: 12px; padding: 10px;">Guruh</button>
+                <button class="btn-main" onclick="tg.openTelegramLink('https://t.me/railway_news_uz')" style="background: var(--tg-secondary); color: var(--tg-text); font-size: 12px; padding: 10px;" data-i18n="support_news">Kanal</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Stars/Premium Section -->
     <div id="stars-section" class="section">
         <div class="premium-status-bar" id="p-status">
@@ -405,6 +432,10 @@ html, body {
     <div class="nav-item" onclick="navTo('stars-section', this)">
         <span class="nav-icon">⭐</span>
         <span class="nav-label" data-i18n="nav_stars">Stars</span>
+    </div>
+    <div class="nav-item" onclick="navTo('support-section', this)">
+        <span class="nav-icon">🎧</span>
+        <span class="nav-label" data-i18n="nav_support">Yordam</span>
     </div>
 </div>
 
@@ -486,20 +517,35 @@ const translations = {
         buy_btn: "Buy Now", modal_title: "Choose Premium", plan_1: "1 day", plan_5: "5 days", plan_10: "10 days", close_btn: "Close"
     },
     kaa: {
-        app_title: "Railway Bot", app_subtitle: "Tezkor bilet baqlaw sisteması",
-        from: "QAYERDEN", to: "QAYERGE", departure_date: "KETIW SÁNESI",
-        search_btn: "🔍 Izlew", nav_search: "Izlew", nav_kuzatuv: "Baqlaw", nav_stars: "Stars",
-        no_trains: "Poyezd tabılmadı.", no_tickets: "Biletler qalmaǵan",
-        lower: "Tómengi", upper: "Joqarǵı", sitting: "Otırıw", price_suffix: "som",
-        start_monitor: "Baqlawdı qosıw", monitoring_title: "Aktiv baqlawlar",
-        empty_monitor: "Ele baqlawlar joq.", delete: "Óshiriw",
-        wait: "Kutilmekte...", loading: "Izlenbekte...",
-        added: "Qosıldı!", interval: "Interval",
-        locked: "Premium jazılıw talap etiledi.", status_oddiy: "Holatı: Oddiy",
-        premium_title: "Premium Abzallıqları", premium_desc: "• Tezkor baqlaw (15s, 30s)<br>• Sheksiz baqlawlar sanı<br>• Birinshilerden bolıp xabar alıw",
-        buy_btn: "Satıp alıw", modal_title: "Premium Saylań", plan_1: "1 kúnlik", plan_5: "5 kúnlik", plan_10: "10 kúnlik", close_btn: "Jabıw"
+        ...translations.kaa,
+        support_placeholder: "Xabarıńızdı jazıń...", send_btn: "Jiberiw", support_sent: "Xabar jiberildi!", support_error: "Xatolik yuz berdi"
     }
 };
+
+translations.uz.support_placeholder = "Xabaringizni yozing...";
+translations.uz.send_btn = "Yuborish";
+translations.uz.support_sent = "Xabar yuborildi! Tez orada javob beramiz.";
+translations.uz.support_error = "Xatolik yuz berdi. Keyinroq urinib ko'ring.";
+
+translations.uz_cyrl.support_placeholder = "Хабарингизни ёзинг...";
+translations.uz_cyrl.send_btn = "Юбориш";
+translations.uz_cyrl.support_sent = "Хабар юборилди! Тез орада жавоб берамиз.";
+translations.uz_cyrl.support_error = "Хатолик юз берди. Кейинроқ уриниб кўринг.";
+
+translations.ru.support_placeholder = "Напишите ваше сообщение...";
+translations.ru.send_btn = "Отправить";
+translations.ru.support_sent = "Сообщение отправлено! Мы скоро ответим.";
+translations.ru.support_error = "Произошла ошибка. Попробуйте позже.";
+
+translations.en.support_placeholder = "Type your message...";
+translations.en.send_btn = "Send";
+translations.en.support_sent = "Message sent! We will reply soon.";
+translations.en.support_error = "An error occurred. Please try again.";
+
+translations.kaa.support_placeholder = "Xabarıńızdı jazıń...";
+translations.kaa.send_btn = "Jiberiw";
+translations.kaa.support_sent = "Xabar jiberildi! Tez arada juwap beremiz.";
+translations.kaa.support_error = "Xatolik júz berdi. Keyinirek urınıp kóriń.";
 
 const langLabels = {
     uz: "🇺🇿 UZ",
@@ -521,6 +567,13 @@ function setLanguage(lang) {
         const key = el.getAttribute('data-i18n');
         if (translations[lang][key]) {
             el.innerHTML = translations[lang][key];
+        }
+    });
+
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (translations[lang][key]) {
+            el.placeholder = translations[lang][key];
         }
     });
     loadSubs();
@@ -741,6 +794,40 @@ async function buyPremium(days) {
                 tg.showAlert("Tabriklaymiz! Premium faollashdi.");
             }
         });
+    }
+}
+
+async function sendSupportMessage() {
+    const input = document.getElementById('support-msg');
+    const btn = document.getElementById('support-send-btn');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    btn.disabled = true;
+    btn.innerText = i18n('wait');
+
+    try {
+        const r = await fetch('/api/support', { 
+            method: 'POST', 
+            body: JSON.stringify({
+                user_id: tg.initDataUnsafe?.user?.id || 0,
+                user_name: tg.initDataUnsafe?.user?.first_name || 'User',
+                username: tg.initDataUnsafe?.user?.username || '',
+                message: msg
+            }) 
+        });
+        const res = await r.json();
+        if (res.ok) {
+            tg.showAlert(i18n('support_sent'));
+            input.value = "";
+        } else {
+            tg.showAlert(i18n('support_error'));
+        }
+    } catch(e) {
+        tg.showAlert(i18n('support_error'));
+    } finally {
+        btn.disabled = false;
+        btn.innerText = i18n('send_btn');
     }
 }
 

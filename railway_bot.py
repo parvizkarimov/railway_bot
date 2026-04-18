@@ -642,9 +642,32 @@ async def start_webserver():
     app.router.add_post("/api/subs/delete", handle_del_sub)
     app.router.add_post("/api/subs/update", handle_update_sub)
     app.router.add_post("/api/create_invoice", handle_create_invoice)
+    app.router.add_post("/api/support", handle_support_api)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
+
+async def handle_support_api(request):
+    try:
+        body = await request.json()
+        uid = body.get("user_id")
+        name = body.get("user_name")
+        username = body.get("username", "")
+        msg = body.get("message")
+        
+        admin_msg = f"🎧 <b>Yangi Support xabari!</b>\n\n" \
+                    f"👤 <b>Kimdan:</b> {name} (@{username})\n" \
+                    f"🆔 <b>ID:</b> {uid}\n\n" \
+                    f"📝 <b>Xabar:</b>\n{msg}"
+        
+        try:
+            await bot.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
+            return web.json_response({"ok": True})
+        except Exception as e:
+            logging.error(f"Admin xabar yuborishda xato: {e}")
+            return web.json_response({"ok": False, "error": "Admin xabar qabul qila olmadi"})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
 
 async def main():
     await init_db()
