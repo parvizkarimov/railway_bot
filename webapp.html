@@ -460,18 +460,33 @@ function setChip(el, sec) {
 
 async function addWatch(num) {
     const btn = document.getElementById(`btn-${num}`);
-    const iText = document.querySelector(`#int-${num} .active`).innerText.replace('s','').replace('🔒','').trim();
+    if (btn.disabled || btn.classList.contains('added')) return;
+
+    btn.disabled = true;
+    btn.innerText = "⌛ Qo'shilmoqda...";
+
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
         from: document.getElementById('from').value, to: document.getElementById('to').value,
-        date: document.getElementById('date').value, interval: parseInt(iText),
+        date: document.getElementById('date').value, interval: 60,
         prefs: ["lower", "upper", "sitting"]
     }) });
     const res = await r.json();
     if (res.ok) { 
         btn.innerText = "✅ Qo'shildi";
         btn.classList.add('added');
-    } else { tg.showAlert(res.error); }
+        btn.disabled = true;
+        
+        // Badge raqamini darhol yangilash
+        const badge = document.getElementById('sub-badge');
+        let currentCount = parseInt(badge.innerText) || 0;
+        badge.innerText = currentCount + 1;
+        badge.style.display = 'block';
+    } else { 
+        btn.disabled = false;
+        btn.innerText = "🔔 Kuzatuvni yoqish";
+        tg.showAlert(res.error); 
+    }
 }
 
 async function loadSubs() {
