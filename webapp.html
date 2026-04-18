@@ -303,11 +303,11 @@ body {
         <div class="lang-switcher">
             <button class="lang-btn" onclick="toggleLang()">🌐 <span id="current-lang">UZ</span></button>
             <div class="lang-dropdown" id="lang-dropdown">
-                <div class="lang-item" onclick="setLanguage('uz')">O'zbekcha</div>
-                <div class="lang-item" onclick="setLanguage('uz_cyrl')">Ўзбекча</div>
-                <div class="lang-item" onclick="setLanguage('ru')">Русский</div>
-                <div class="lang-item" onclick="setLanguage('en')">English</div>
-                <div class="lang-item" onclick="setLanguage('kaa')">Qaraqalpaqsha</div>
+                <div class="lang-item" onclick="setLanguage('uz')">🇺🇿 O'zbekcha</div>
+                <div class="lang-item" onclick="setLanguage('uz_cyrl')">🇺🇿 Ўзбекча</div>
+                <div class="lang-item" onclick="setLanguage('ru')">🇷🇺 Русский</div>
+                <div class="lang-item" onclick="setLanguage('en')">🇺🇸 English</div>
+                <div class="lang-item" onclick="setLanguage('kaa')">🇺🇿 Qaraqalpaqsha</div>
             </div>
         </div>
         <span class="header-icon">🚄</span>
@@ -486,12 +486,20 @@ const translations = {
     }
 };
 
+const langLabels = {
+    uz: "🇺🇿 UZ",
+    uz_cyrl: "🇺🇿 ЎЗ",
+    ru: "🇷🇺 RU",
+    en: "🇺🇸 EN",
+    kaa: "🇺🇿 KAA"
+};
+
 let currentLang = localStorage.getItem('lang') || 'uz';
 
 function setLanguage(lang) {
     currentLang = lang;
     localStorage.setItem('lang', lang);
-    document.getElementById('current-lang').innerText = lang.toUpperCase();
+    document.getElementById('current-lang').innerText = langLabels[lang];
     document.getElementById('lang-dropdown').classList.remove('show');
     
     document.querySelectorAll('[data-i18n]').forEach(el => {
