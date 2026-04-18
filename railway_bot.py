@@ -82,14 +82,7 @@ async def refresh_cookie():
                 _cookie_cache["cookie"] = cookie_str
                 _cookie_cache["xsrf"] = xsrf
                 _cookie_cache["updated"] = datetime.now()
-                await db("""CREATE TABLE IF NOT EXISTS support_chat (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        sender TEXT, -- 'user' yoki 'admin'
-        message TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    logging.info("Ma'lumotlar bazasi tayyor.")
+                logging.info("Cookie yangilandi.")
                 return True
             else:
                 await send_error_to_admin("Cookie yoki XSRF token olinmadi. Sayt strukturasi o'zgargan bo'lishi mumkin.")
@@ -234,6 +227,13 @@ async def init_db():
             max_price INTEGER DEFAULT 0,
             last_checked INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1)""")
+        await conn.execute("""CREATE TABLE IF NOT EXISTS support_chat (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            sender TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
         # Eski bazalarni yangilash (agar train_num bo'lmasa)
         try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN train_num TEXT");
         except: pass
