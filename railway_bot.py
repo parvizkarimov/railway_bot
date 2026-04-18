@@ -16,9 +16,15 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, WebAppInfo
 import json
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7388718131:AAEUW-R9v0jI3uXN-Y8H0wW0xX0yZ0a1b2c")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "474681690"))
+# ---- Configuration ----
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+
+if not BOT_TOKEN:
+    logging.error("BOT_TOKEN topilmadi! Railway Variables bo'limini tekshiring.")
+if ADMIN_ID == 0:
+    logging.warning("ADMIN_ID o'rnatilmagan! /users buyrug'i ishlamasligi mumkin.")
 
 async def send_error_to_admin(msg):
     """Xatoliklarni adminga yuborish"""
@@ -83,8 +89,6 @@ async def get_cookie(force=False):
     await refresh_cookie()
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "474681690"))
 PORT = int(os.getenv("PORT", 8080))
 
 STATIONS = {

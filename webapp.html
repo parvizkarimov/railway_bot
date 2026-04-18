@@ -416,6 +416,13 @@ function renderTrains(trains) {
     const res = document.getElementById('results');
     if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
     
+    // Vaqt bo'yicha saralash (Departure time)
+    trains.sort((a, b) => {
+        const timeA = a.departureDate.split(' ')[1];
+        const timeB = b.departureDate.split(' ')[1];
+        return timeA.localeCompare(timeB);
+    });
+    
     res.innerHTML = trains.map(t => {
         const seatHtml = (t.cars || []).map(c => `
             <div class="seat-box">
@@ -441,8 +448,8 @@ function renderTrains(trains) {
             <div class="chip-group">
                 <span class="form-label">Interval</span>
                 <div class="chips" id="int-${t.number}">
-                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s</span>
-                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s ⭐</span>
+                    <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s ⭐</span>
                     <span class="chip active" onclick="setChip(this,60)">60s</span>
                 </div>
             </div>
