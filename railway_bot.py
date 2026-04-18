@@ -198,9 +198,12 @@ async def init_db():
         os.makedirs(db_dir)
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY, username TEXT,
+            user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT,
             coins INTEGER DEFAULT 0,
             is_premium INTEGER DEFAULT 0, premium_until TEXT)""")
+        # Eski bazalarga full_name qo'shish
+        try: await conn.execute("ALTER TABLE users ADD COLUMN full_name TEXT");
+        except: pass
         await conn.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER, from_st TEXT, to_st TEXT,
@@ -229,7 +232,8 @@ dp = Dispatcher(storage=MemoryStorage())
 
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
-    await db("INSERT OR IGNORE INTO users (user_id, username) VALUES (?,?)", (msg.from_user.id, msg.from_user.username))
+    await db("INSERT INTO users (user_id, username, full_name) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET username=excluded.username, full_name=excluded.full_name", 
+             (msg.from_user.id, msg.from_user.username, msg.from_user.full_name))
     user = await db("SELECT coins FROM users WHERE user_id=?", (msg.from_user.id,), fetch=True)
     coins = user[0][0] if user else 0
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -304,7 +308,8 @@ async def cmd_admin_users(msg: types.Message):
     
     users = await db("""
         SELECT u.user_id, u.username, u.premium_until, 
-        (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.is_active = 1) as sub_count
+        (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.is_active = 1) as sub_count,
+        u.full_name
         FROM users u
     """, fetch=True)
     if not users:
@@ -313,7 +318,7 @@ async def cmd_admin_users(msg: types.Message):
     total = len(users)
     text = f"<b>👥 Jami foydalanuvchilar:</b> {total}\n\n"
     
-    for u_id, u_name, p_until, sub_count in users[:50]:
+    for u_id, u_username, p_until, sub_count, u_full_name in users[:50]:
         status = "Oddiy"
         if p_until:
             try:
@@ -323,10 +328,11 @@ async def cmd_admin_users(msg: types.Message):
                     status = f"❌ Muddati o'tgan ({p_until[:10]})"
             except: pass
         
-        name = u_name if u_name else "Foydalanuvchi"
-        # Ismlardagi < > belgilarini tozalash (HTML xato bermasligi uchun)
+        name = u_full_name if u_full_name else "Foydalanuvchi"
         name = name.replace("<", "&lt;").replace(">", "&gt;")
-        text += f"👤 {name} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta\n"
+        user_link = f" @{u_username}" if u_username else ""
+        
+        text += f"👤 {name}{user_link} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta\n"
     
     if total > 50:
         text += f"\n... va yana {total-50} ta foydalanuvchi."
