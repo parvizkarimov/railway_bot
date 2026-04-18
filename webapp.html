@@ -37,48 +37,36 @@ body {
     position: absolute;
     top: 15px;
     right: 15px;
-    z-index: 1100;
+    z-index: 2000; /* Nav-nav dan ham ustun */
 }
 .lang-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: var(--tg-text);
     padding: 6px 12px;
     border-radius: 12px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    backdrop-filter: blur(8px);
-    transition: 0.3s;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
-.lang-btn:active { transform: scale(0.95); }
 .lang-dropdown {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 5px);
     right: 0;
     background: var(--tg-bg);
-    border: 1px solid rgba(46, 166, 255, 0.2);
+    border: 1px solid rgba(46, 166, 255, 0.3);
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     display: none;
-    min-width: 140px;
-    overflow: hidden;
-    margin-top: 10px;
-    animation: slideDown 0.3s ease-out;
+    min-width: 150px;
+    z-index: 2001;
 }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 .lang-dropdown.show { display: block; }
-.lang-item {
-    padding: 12px 16px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: 0.2s;
-    border-bottom: 1px solid rgba(0,0,0,0.03);
-}
-.lang-item:last-child { border-bottom: none; }
-.lang-item:hover { background: rgba(46, 166, 255, 0.1); color: var(--accent-blue); }
 
-/* 3D Header Section */
 .header-glass {
     background: linear-gradient(135deg, rgba(46, 166, 255, 0.1), rgba(46, 166, 255, 0.05));
     border-radius: 24px;
@@ -87,7 +75,7 @@ body {
     text-align: center;
     border: 1px solid rgba(46, 166, 255, 0.1);
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden;  <-- BU QATORNI OLIB TASHLADIK */
 }
 .header-glass::after {
     content: '';
