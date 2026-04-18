@@ -3,30 +3,22 @@ import asyncio
 import aiohttp
 import aiosqlite
 import logging
-import re
 import os
 import time
 from datetime import datetime, timedelta
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, WebAppInfo
 import json
 
 # ---- Configuration ----
-token_raw = os.getenv("BOT_TOKEN", "")
-BOT_TOKEN = token_raw.strip() if token_raw else None
-
-admin_raw = os.getenv("ADMIN_ID", "0")
-try:
-    ADMIN_ID = int(admin_raw.strip())
-except:
-    ADMIN_ID = 0
-
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip() or None
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0").strip() or 0)
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
+DB_PATH = os.getenv("DB_PATH", "bot.db")
+PORT = int(os.getenv("PORT", 8080))
 
 if not BOT_TOKEN:
     print("❌ ERROR: BOT_TOKEN topilmadi! Railway Variables bo'limini tekshiring.")
@@ -43,7 +35,32 @@ async def send_error_to_admin(msg):
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
 COOKIE_TTL = 1500  # 25 daqiqa
 
-STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"}
+# Barcha stansiyalar
+STATIONS = {
+    "Toshkent": "2900000", "Samarqand": "2900700", "Buxoro": "2900800",
+    "Namangan": "2900940", "Andijon": "2900680", "Qoqon": "2900880",
+    "Qarshi": "2900750", "Termiz": "2900255", "Xiva": "2900172",
+    "Urgench": "2900790", "Jizzax": "2900720", "Nukus": "2900970",
+}
+
+# Persistent HTTP session (har API chaqiriqda yangi ulanish ochilmaydi)
+_http_session: aiohttp.ClientSession | None = None
+
+async def get_http_session() -> aiohttp.ClientSession:
+    global _http_session
+    if _http_session is None or _http_session.closed:
+        _http_session = aiohttp.ClientSession()
+    return _http_session
+
+# webapp.html ni xotirada saqlash (diskdan har safar o'qilmaydi)
+_webapp_cache: str | None = None
+
+def get_webapp_html() -> str:
+    global _webapp_cache
+    if _webapp_cache is None:
+        with open("webapp.html", "r", encoding="utf-8") as f:
+            _webapp_cache = f.read()
+    return _webapp_cache
 
 async def cookie_refresher():
     """Orqa fonda cookielarni har 20 minutda yangilab turish"""
@@ -104,14 +121,6 @@ async def get_cookie(force=False):
     await refresh_cookie()
     return _cookie_cache["cookie"], _cookie_cache["xsrf"]
 
-PORT = int(os.getenv("PORT", 8080))
-
-STATIONS = {
-    "Toshkent": "2900000", "Samarqand": "2900700", "Buxoro": "2900800",
-    "Namangan": "2900940", "Andijon": "2900680", "Qoqon": "2900880",
-    "Qarshi": "2900750", "Termiz": "2900255", "Xiva": "2900172",
-    "Urgench": "2900790", "Jizzax": "2900720", "Nukus": "2900970",
-}
 
 async def check_trains(from_code, to_code, date, _retry=0):
     url = "https://eticket.railway.uz/api/v3/handbook/trains/list"
@@ -135,17 +144,18 @@ async def check_trains(from_code, to_code, date, _retry=0):
     }
     payload = {"directions": {"forward": {"date": date, "depStationCode": from_code, "arvStationCode": to_code}}}
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers, timeout=30) as r:
-                if r.status == 200:
-                    return await r.json(content_type=None)
-                elif r.status == 403:
-                    await send_error_to_admin(f"❌ IP BLOKLANDI (Status 403). Railway sayti so'rovni rad etdi.")
-                elif r.status in (401, 419) and _retry < 2:
-                    await get_cookie(force=True)
-                    return await check_trains(from_code, to_code, date, _retry=_retry+1)
-                else:
-                    logging.warning(f"API status xatosi: {r.status}")
+        session = await get_http_session()
+        async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as r:
+            if r.status == 200:
+                return await r.json(content_type=None)
+            elif r.status == 403:
+                logging.warning("API: 403 Forbidden — IP bloklangan yoki cookie eskirgan")
+                await get_cookie(force=True)
+            elif r.status in (401, 419) and _retry < 2:
+                await get_cookie(force=True)
+                return await check_trains(from_code, to_code, date, _retry=_retry+1)
+            else:
+                logging.warning(f"API status xatosi: {r.status}")
     except Exception as e:
         logging.error(f"check_trains xato: {e}")
     return None
@@ -203,10 +213,6 @@ def format_pt_name(name):
     return names.get(name.lower(), name.capitalize())
 
 # ---- Database ----
-# DOIMIY XOTIRA UCHUN: Railway yoki shunga o'xshash joyda /data papkasini ulab, 
-# DB_PATH ni "/data/bot.db" qilib qo'yishingiz kerak.
-DB_PATH = os.getenv("DB_PATH", "bot.db")
-
 async def init_db():
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
@@ -440,7 +446,6 @@ async def del_sub(cb: types.CallbackQuery):
     await cb.message.edit_text("✅ Kuzatuv o'chirildi.")
 
 # ---- Checker Logic ----
-# ---- Checker Logic ----
 async def process_subscription(sub, now):
     sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num = sub
     logging.info(f"Checking sub {sid} for user {uid} ({f_st}->{t_st}, {s_date}, reys: {s_train_num})")
@@ -532,7 +537,7 @@ async def checker():
 
 # ---- Web Server ----
 async def handle_webapp(request):
-    with open("webapp.html", "r", encoding="utf-8") as f: return web.Response(text=f.read(), content_type="text/html")
+    return web.Response(text=get_webapp_html(), content_type="text/html")
 
 async def handle_trains_api(request):
     try:
@@ -662,21 +667,6 @@ async def handle_create_invoice(request):
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)})
 
-async def start_webserver():
-    app = web.Application()
-    app.router.add_get("/", handle_webapp)
-    app.router.add_post("/api/trains", handle_trains_api)
-    app.router.add_get("/api/subs", handle_get_subs)
-    app.router.add_post("/api/subs", handle_add_sub)
-    app.router.add_post("/api/subs/delete", handle_del_sub)
-    app.router.add_post("/api/subs/update", handle_update_sub)
-    app.router.add_post("/api/create_invoice", handle_create_invoice)
-    app.router.add_post("/api/support", handle_support_api)
-    app.router.add_get("/api/support/messages", handle_get_chat_api)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    await web.TCPSite(runner, "0.0.0.0", PORT).start()
-
 async def handle_support_api(request):
     try:
         body = await request.json()
@@ -711,19 +701,38 @@ async def handle_get_chat_api(request):
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)})
 
+async def start_webserver():
+    app = web.Application()
+    app.router.add_get("/", handle_webapp)
+    app.router.add_post("/api/trains", handle_trains_api)
+    app.router.add_get("/api/subs", handle_get_subs)
+    app.router.add_post("/api/subs", handle_add_sub)
+    app.router.add_post("/api/subs/delete", handle_del_sub)
+    app.router.add_post("/api/subs/update", handle_update_sub)
+    app.router.add_post("/api/create_invoice", handle_create_invoice)
+    app.router.add_post("/api/support", handle_support_api)
+    app.router.add_get("/api/support/messages", handle_get_chat_api)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", PORT).start()
+    logging.info(f"Web server {PORT} portda ishga tushdi")
+
 async def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S"
+    )
     await init_db()
     await start_webserver()
-    
-    # Orqa fon vazifalarini ishga tushirish
     asyncio.create_task(cookie_refresher())
     asyncio.create_task(checker())
-    
-    # Deploy xabari
-    await send_error_to_admin("🚀 *Bot serverda muvaffaqiyatli ishga tushdi!* (Deploy completed)")
-    
-    await dp.start_polling(bot)
+    await send_error_to_admin("🚀 *Bot ishga tushdi!*")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        if _http_session and not _http_session.closed:
+            await _http_session.close()
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
