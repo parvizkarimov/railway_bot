@@ -311,9 +311,9 @@ async def cmd_admin_users(msg: types.Message):
         return await msg.answer("Foydalanuvchilar topilmadi.")
     
     total = len(users)
-    text = f"👥 *Jami foydalanuvchilar:* {total}\n\n"
+    text = f"<b>👥 Jami foydalanuvchilar:</b> {total}\n\n"
     
-    for u_id, u_name, p_until, sub_count in users[:50]: # Birinchi 50 tasini ko'rsatish
+    for u_id, u_name, p_until, sub_count in users[:50]:
         status = "Oddiy"
         if p_until:
             try:
@@ -323,13 +323,15 @@ async def cmd_admin_users(msg: types.Message):
                     status = f"❌ Muddati o'tgan ({p_until[:10]})"
             except: pass
         
-        name = u_name if u_name else "NoName"
-        text += f"👤 {name} (`{u_id}`) — {status} | 🔔 {sub_count} ta\n"
+        name = u_name if u_name else "Foydalanuvchi"
+        # Ismlardagi < > belgilarini tozalash (HTML xato bermasligi uchun)
+        name = name.replace("<", "&lt;").replace(">", "&gt;")
+        text += f"👤 {name} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta\n"
     
     if total > 50:
         text += f"\n... va yana {total-50} ta foydalanuvchi."
         
-    await msg.answer(text, parse_mode="Markdown")
+    await msg.answer(text, parse_mode="HTML")
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
