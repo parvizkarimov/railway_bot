@@ -468,7 +468,9 @@ async function addWatch(num) {
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
         from: document.getElementById('from').value, to: document.getElementById('to').value,
-        date: document.getElementById('date').value, interval: 60,
+        date: document.getElementById('date').value, 
+        train_num: num,
+        interval: 60,
         prefs: ["lower", "upper", "sitting"]
     }) });
     const res = await r.json();
