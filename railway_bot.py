@@ -58,15 +58,22 @@ async def refresh_cookie():
     try:
         from playwright.async_api import async_playwright
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+            browser = await p.chromium.launch(headless=True, args=[
+                "--no-sandbox", 
+                "--disable-dev-shm-usage",
+                "--disable-setuid-sandbox",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process" # RAM tejash uchun
+            ])
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
             page = await context.new_page()
-            await page.goto("https://eticket.railway.uz/uz/home", wait_until="domcontentloaded", timeout=60000)
-            await page.wait_for_timeout(5000)
+            # Timeoutni 60 soniyaga oshiramiz
             await page.goto("https://eticket.railway.uz/uz/pages/trains-page", wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(3000)
+            await asyncio.sleep(5) # Sahifa to'liq yuklanishi uchun kutiladi
+            
             cookies = await context.cookies()
             cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
             xsrf = unquote(next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), ""))
