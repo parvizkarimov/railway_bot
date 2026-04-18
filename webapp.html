@@ -32,6 +32,52 @@ body {
 
 .app { max-width: 480px; margin: 0 auto; padding: 16px; }
 
+/* Language Switcher */
+.lang-switcher {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1100;
+}
+.lang-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--tg-text);
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: 0.3s;
+}
+.lang-btn:active { transform: scale(0.95); }
+.lang-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--tg-bg);
+    border: 1px solid rgba(46, 166, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    display: none;
+    min-width: 140px;
+    overflow: hidden;
+    margin-top: 10px;
+    animation: slideDown 0.3s ease-out;
+}
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.lang-dropdown.show { display: block; }
+.lang-item {
+    padding: 12px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+.lang-item:last-child { border-bottom: none; }
+.lang-item:hover { background: rgba(46, 166, 255, 0.1); color: var(--accent-blue); }
+
 /* 3D Header Section */
 .header-glass {
     background: linear-gradient(135deg, rgba(46, 166, 255, 0.1), rgba(46, 166, 255, 0.05));
@@ -266,16 +312,26 @@ body {
 <div class="app">
     <!-- Header -->
     <div class="header-glass">
+        <div class="lang-switcher">
+            <button class="lang-btn" onclick="toggleLang()">🌐 <span id="current-lang">UZ</span></button>
+            <div class="lang-dropdown" id="lang-dropdown">
+                <div class="lang-item" onclick="setLanguage('uz')">O'zbekcha</div>
+                <div class="lang-item" onclick="setLanguage('uz_cyrl')">Ўзбекча</div>
+                <div class="lang-item" onclick="setLanguage('ru')">Русский</div>
+                <div class="lang-item" onclick="setLanguage('en')">English</div>
+                <div class="lang-item" onclick="setLanguage('kaa')">Qaraqalpaqsha</div>
+            </div>
+        </div>
         <span class="header-icon">🚄</span>
-        <h1>Railway Bot</h1>
-        <p>Tezkor chipta kuzatuv tizimi</p>
+        <h1 data-i18n="app_title">Railway Bot</h1>
+        <p data-i18n="app_subtitle">Tezkor chipta kuzatuv tizimi</p>
     </div>
 
     <!-- Home/Search Section -->
     <div id="search-section" class="section active">
         <div class="glass-card">
             <div class="form-group">
-                <label class="form-label">Qayerdan</label>
+                <label class="form-label" data-i18n="from">Qayerdan</label>
                 <div class="input-wrapper">
                     <span class="input-icon">📍</span>
                     <select id="from" class="form-select"></select>
@@ -287,7 +343,7 @@ body {
             </div>
 
             <div class="form-group">
-                <label class="form-label">Qayerga</label>
+                <label class="form-label" data-i18n="to">Qayerga</label>
                 <div class="input-wrapper">
                     <span class="input-icon">🏁</span>
                     <select id="to" class="form-select"></select>
@@ -295,14 +351,14 @@ body {
             </div>
 
             <div class="form-group">
-                <label class="form-label">Ketish sanasi</label>
+                <label class="form-label" data-i18n="departure_date">Ketish sanasi</label>
                 <div class="input-wrapper">
                     <span class="input-icon">📅</span>
                     <input type="date" id="date" class="form-input">
                 </div>
             </div>
 
-            <button class="btn-main" onclick="search()">🔍 Qidirish</button>
+            <button class="btn-main" onclick="search()" data-i18n="search_btn">🔍 Qidirish</button>
         </div>
         <div id="results"></div>
     </div>
@@ -315,19 +371,19 @@ body {
     <!-- Stars/Premium Section -->
     <div id="stars-section" class="section">
         <div class="premium-status-bar" id="p-status">
-            <span>Holat: Oddiy</span>
+            <span data-i18n="status_oddiy">Holat: Oddiy</span>
             <span>⭐ 0</span>
         </div>
         
         <div class="glass-card" style="text-align: center;">
             <span style="font-size: 50px;">💎</span>
-            <h2 style="margin: 10px 0;">Premium Afzalliklari</h2>
-            <p style="opacity: 0.6; font-size: 14px; margin-bottom: 20px;">
+            <h2 style="margin: 10px 0;" data-i18n="premium_title">Premium Afzalliklari</h2>
+            <p style="opacity: 0.6; font-size: 14px; margin-bottom: 20px;" data-i18n="premium_desc">
                 • Tezkor kuzatuv (15s, 30s)<br>
                 • Cheksiz kuzatuvlar soni<br>
                 • Birinchilardan bo'lib xabar olish
             </p>
-            <button class="btn-main" onclick="openPremiumModal()">Sotib olish</button>
+            <button class="btn-main" onclick="openPremiumModal()" data-i18n="buy_btn">Sotib olish</button>
         </div>
     </div>
 </div>
@@ -336,44 +392,141 @@ body {
 <div class="bottom-nav">
     <div class="nav-item active" onclick="navTo('search-section', this)">
         <span class="nav-icon">🏠</span>
-        <span class="nav-label">Qidiruv</span>
+        <span class="nav-label" data-i18n="nav_search">Qidiruv</span>
     </div>
     <div class="nav-item" onclick="navTo('subs-section', this)" style="position: relative;">
         <span class="nav-icon">🔔</span>
-        <span class="nav-label">Kuzatuv</span>
+        <span class="nav-label" data-i18n="nav_kuzatuv">Kuzatuv</span>
         <div id="sub-badge" class="nav-badge">0</div>
     </div>
     <div class="nav-item" onclick="navTo('stars-section', this)">
         <span class="nav-icon">⭐</span>
-        <span class="nav-label">Stars</span>
+        <span class="nav-label" data-i18n="nav_stars">Stars</span>
     </div>
 </div>
 
 <!-- Premium Modal -->
 <div id="premiumModal" class="modal" onclick="closeModal(event)">
     <div class="modal-c" onclick="event.stopPropagation()">
-        <div class="modal-title">Premium Tanlang</div>
+        <div class="modal-title" data-i18n="modal_title">Premium Tanlang</div>
         <div class="plan-btn" onclick="buyPremium(1)">
-            <span>1 kunlik</span> <span class="plan-price">1 ⭐</span>
+            <span data-i18n="plan_1">1 kunlik</span> <span class="plan-price">1 ⭐</span>
         </div>
         <div class="plan-btn" onclick="buyPremium(5)">
-            <span>5 kunlik</span> <span class="plan-price">5 ⭐</span>
+            <span data-i18n="plan_5">5 kunlik</span> <span class="plan-price">5 ⭐</span>
         </div>
         <div class="plan-btn" onclick="buyPremium(10)">
-            <span>10 kunlik</span> <span class="plan-price">10 ⭐</span>
+            <span data-i18n="plan_10">10 kunlik</span> <span class="plan-price">10 ⭐</span>
         </div>
-        <button class="btn-main" style="background: var(--tg-secondary); color: var(--tg-text); margin-top: 10px;" onclick="closeModal(null)">Yopish</button>
+        <button class="btn-main" style="background: var(--tg-secondary); color: var(--tg-text); margin-top: 10px;" onclick="closeModal(null)" data-i18n="close_btn">Yopish</button>
     </div>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
 const STATIONS = {"Toshkent":"2900000","Samarqand":"2900700","Buxoro":"2900800","Namangan":"2900940","Andijon":"2900680","Qoqon":"2900880","Qarshi":"2900750","Termiz":"2900255","Xiva":"2900172","Urgench":"2900790","Jizzax":"2900720","Nukus":"2900970"};
-let isPremium = false;
+const translations = {
+    uz: {
+        app_title: "Railway Bot", app_subtitle: "Tezkor chipta kuzatuv tizimi",
+        from: "QAYERDAN", to: "QAYERGA", departure_date: "KETISH SANASI",
+        search_btn: "🔍 Qidirish", nav_search: "Qidiruv", nav_kuzatuv: "Kuzatuv", nav_stars: "Stars",
+        no_trains: "Poyezd topilmadi.", no_tickets: "Chiptalar qolmagan",
+        lower: "Pastki", upper: "Tepadagi", sitting: "O'tirish", price_suffix: "so'm",
+        start_monitor: "Kuzatuvni yoqish", monitoring_title: "Faol kuzatuvlar",
+        empty_monitor: "Hali kuzatuvlar yo'q.", delete: "O'chirish",
+        wait: "Kutilmoqda...", loading: "Qidirilmoqda...",
+        added: "Qo'shildi!", interval: "Interval",
+        locked: "Premium obuna talab qilinadi.", status_oddiy: "Holat: Oddiy",
+        premium_title: "Premium Afzalliklari", premium_desc: "• Tezkor kuzatuv (15s, 30s)<br>• Cheksiz kuzatuvlar soni<br>• Birinchilardan bo'lib xabar olish",
+        buy_btn: "Sotib olish", modal_title: "Premium Tanlang", plan_1: "1 kunlik", plan_5: "5 kunlik", plan_10: "10 kunlik", close_btn: "Yopish"
+    },
+    uz_cyrl: {
+        app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
+        from: "ҚАЕРДАН", to: "ҚАЕРГА", departure_date: "КЕТИШ САНАСИ",
+        search_btn: "🔍 Қидириш", nav_search: "Қидирув", nav_kuzatuv: "Кузатув", nav_stars: "Stars",
+        no_trains: "Поезд топилмади.", no_tickets: "Чипталар қолмаган",
+        lower: "Пастки", upper: "Тепадаги", sitting: "Ўтириш", price_suffix: "сўм",
+        start_monitor: "Кузатувни ёқиш", monitoring_title: "Фаол кузатувлар",
+        empty_monitor: "Ҳали кузатувлар йўқ.", delete: "Ўчириш",
+        wait: "Кутилмоқда...", loading: "Қидирилмоқда...",
+        added: "Қўшилди!", interval: "Интервал",
+        locked: "Premium обуна талаб қилинади.", status_oddiy: "Ҳолат: Оддий",
+        premium_title: "Premium Афзалликлари", premium_desc: "• Тезкор кузатув (15s, 30s)<br>• Чексиз кузатувлар сони<br>• Биринчилардан бўлиб хабар олиш",
+        buy_btn: "Сотиб олиш", modal_title: "Premium Танланг", plan_1: "1 кунлик", plan_5: "5 кунлик", plan_10: "10 кунлик", close_btn: "Ёпиш"
+    },
+    ru: {
+        app_title: "Railway Bot", app_subtitle: "Система мониторинга билетов",
+        from: "ОТКУДА", to: "КУДА", departure_date: "ДАТА ОТПРАВЛЕНИЯ",
+        search_btn: "🔍 Поиск", nav_search: "Поиск", nav_kuzatuv: "Слежение", nav_stars: "Stars",
+        no_trains: "Поезда не найдены.", no_tickets: "Билетов нет",
+        lower: "Нижнее", upper: "Верхнее", sitting: "Сидячее", price_suffix: "сум",
+        start_monitor: "Включить слежение", monitoring_title: "Активные слежения",
+        empty_monitor: "Нет активных слежений.", delete: "Удалить",
+        wait: "Ожидание...", loading: "Поиск...",
+        added: "Добавлено!", interval: "Интервал",
+        locked: "Требуется Premium подписка.", status_oddiy: "Статус: Обычный",
+        premium_title: "Преимущества Premium", premium_desc: "• Быстрое слежение (15с, 30с)<br>• Безлимит на слежения<br>• Оповещения в числе первых",
+        buy_btn: "Купить", modal_title: "Выберите Premium", plan_1: "1 день", plan_5: "5 дней", plan_10: "10 дней", close_btn: "Закрыть"
+    },
+    en: {
+        app_title: "Railway Bot", app_subtitle: "Fast ticket monitoring system",
+        from: "FROM", to: "TO", departure_date: "DEPARTURE DATE",
+        search_btn: "🔍 Search", nav_search: "Search", nav_kuzatuv: "Monitor", nav_stars: "Stars",
+        no_trains: "No trains found.", no_tickets: "No tickets left",
+        lower: "Lower", upper: "Upper", sitting: "Sitting", price_suffix: "uzs",
+        start_monitor: "Start Monitoring", monitoring_title: "Active Monitoring",
+        empty_monitor: "No active monitors.", delete: "Delete",
+        wait: "Waiting...", loading: "Searching...",
+        added: "Added!", interval: "Interval",
+        locked: "Premium subscription required.", status_oddiy: "Status: Regular",
+        premium_title: "Premium Benefits", premium_desc: "• Fast monitoring (15s, 30s)<br>• Unlimited monitors<br>• Instant notifications",
+        buy_btn: "Buy Now", modal_title: "Choose Premium", plan_1: "1 day", plan_5: "5 days", plan_10: "10 days", close_btn: "Close"
+    },
+    kaa: {
+        app_title: "Railway Bot", app_subtitle: "Tezkor bilet baqlaw sisteması",
+        from: "QAYERDEN", to: "QAYERGE", departure_date: "KETIW SÁNESI",
+        search_btn: "🔍 Izlew", nav_search: "Izlew", nav_kuzatuv: "Baqlaw", nav_stars: "Stars",
+        no_trains: "Poyezd tabılmadı.", no_tickets: "Biletler qalmaǵan",
+        lower: "Tómengi", upper: "Joqarǵı", sitting: "Otırıw", price_suffix: "som",
+        start_monitor: "Baqlawdı qosıw", monitoring_title: "Aktiv baqlawlar",
+        empty_monitor: "Ele baqlawlar joq.", delete: "Óshiriw",
+        wait: "Kutilmekte...", loading: "Izlenbekte...",
+        added: "Qosıldı!", interval: "Interval",
+        locked: "Premium jazılıw talap etiledi.", status_oddiy: "Holatı: Oddiy",
+        premium_title: "Premium Abzallıqları", premium_desc: "• Tezkor baqlaw (15s, 30s)<br>• Sheksiz baqlawlar sanı<br>• Birinshilerden bolıp xabar alıw",
+        buy_btn: "Satıp alıw", modal_title: "Premium Saylań", plan_1: "1 kúnlik", plan_5: "5 kúnlik", plan_10: "10 kúnlik", close_btn: "Jabıw"
+    }
+};
+
+let currentLang = localStorage.getItem('lang') || 'uz';
+
+function setLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    document.getElementById('current-lang').innerText = lang.toUpperCase();
+    document.getElementById('lang-dropdown').classList.remove('show');
+    
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+            el.innerHTML = translations[lang][key];
+        }
+    });
+    loadSubs();
+}
+
+function toggleLang() {
+    document.getElementById('lang-dropdown').classList.toggle('show');
+}
+
+function i18n(key) {
+    return translations[currentLang][key] || key;
+}
 
 function init() {
-    tg.expand(); // Full screen
+    tg.expand();
     tg.ready();
+    setTimeout(() => setLanguage(currentLang), 100);
     
     const f = document.getElementById('from'), t = document.getElementById('to');
     Object.keys(STATIONS).forEach(n => {
@@ -399,24 +552,23 @@ function swap() {
 
 async function search() {
     const f = document.getElementById('from').value, t = document.getElementById('to').value;
-    if (f === t) { tg.showAlert("Qayerdan va Qayerga bir xil bo'lishi mumkin!"); return; }
+    if (f === t) { tg.showAlert(i18n('from') === i18n('to') ? "Same stations" : "Qayerdan va Qayerga bir xil bo'lishi mumkin emas!"); return; }
     const res = document.getElementById('results');
-    res.innerHTML = '<div class="loading"><div class="spinner"></div>Qidirilmoqda...</div>';
+    res.innerHTML = `<div class="loading"><div class="spinner"></div>${i18n('loading')}</div>`;
     
     try {
         const r = await fetch('/api/trains', { method: 'POST', body: JSON.stringify({from: f, to: t, date: document.getElementById('date').value}) });
         const d = await r.json();
         renderTrains(d.trains || []);
     } catch(e) {
-        res.innerHTML = '<div class="loading">Xatolik yuz berdi.</div>';
+        res.innerHTML = `<div class="loading">${i18n('no_trains')}</div>`;
     }
 }
 
 function renderTrains(trains) {
     const res = document.getElementById('results');
-    if (!trains.length) { res.innerHTML = '<div class="loading">Poyezd topilmadi.</div>'; return; }
+    if (!trains.length) { res.innerHTML = `<div class="loading">${i18n('no_trains')}</div>`; return; }
     
-    // Vaqt bo'yicha saralash (Departure time)
     trains.sort((a, b) => {
         const timeA = a.departureDate.split(' ')[1];
         const timeB = b.departureDate.split(' ')[1];
@@ -424,14 +576,22 @@ function renderTrains(trains) {
     });
     
     res.innerHTML = trains.map(t => {
-        const seatHtml = (t.cars || []).map(c => `
+        const seatHtml = (t.cars || []).map(c => {
+            let sType = c.type;
+            if (sType.toLowerCase().includes('past') || sType.toLowerCase().includes('нижн')) sType = i18n('lower');
+            else if (sType.toLowerCase().includes('tepa') || sType.toLowerCase().includes('верхн')) sType = i18n('upper');
+            else if (sType.toLowerCase().includes('o\'tirish') || sType.toLowerCase().includes('сидяч')) sType = i18n('sitting');
+            
+            return `
             <div class="seat-box">
-                <div class="seat-name">${c.type}</div>
-                <div class="seat-cnt">${c.freeSeats} joy</div>
-                <div class="seat-pr">${(c.price||0).toLocaleString()} so'm</div>
-            </div>
-        `).join('');
+                <div class="seat-name">${sType}</div>
+                <div class="seat-cnt">${c.freeSeats}</div>
+                <div class="seat-pr">${(c.price||0).toLocaleString()} ${i18n('price_suffix')}</div>
+            </div>`;
+        }).join('');
         
+        const noSeats = `<div style="grid-column: 1/-1; text-align: center; color: #ff3b30; background: rgba(255, 59, 48, 0.08); border: 1px solid rgba(255, 59, 48, 0.3); border-radius: 12px; padding: 12px; font-weight: 700; font-size: 13px;">⚠️ ${i18n('no_tickets')}</div>`;
+
         return `
         <div class="train-card">
             <div class="train-header">
@@ -443,10 +603,10 @@ function renderTrains(trains) {
                 <div class="time-way"><span class="way-dur">${t.timeOnWay}</span><div class="way-line"></div></div>
                 <div class="time-box"><div class="time-val">${t.arrivalDate.split(' ')[1]}</div><div class="time-st">Arr</div></div>
             </div>
-            <div class="seat-grid">${seatHtml || '<div style="grid-column: 1/-1; text-align: center; color: #ff3b30; background: rgba(255, 59, 48, 0.08); border: 1px solid rgba(255, 59, 48, 0.3); border-radius: 12px; padding: 12px; font-weight: 700; font-size: 13px;">⚠️ Chiptalar qolmagan</div>'}</div>
+            <div class="seat-grid">${seatHtml || noSeats}</div>
             
             <div class="chip-group">
-                <span class="form-label">Interval</span>
+                <span class="form-label" data-i18n="interval">${i18n('interval')}</span>
                 <div class="chips" id="int-${t.number}">
                     <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,15)">15s${!isPremium?' 🔒':''}</span>
                     <span class="chip ${!isPremium?'locked':''}" onclick="setChip(this,30)">30s${!isPremium?' 🔒':''}</span>
@@ -454,7 +614,7 @@ function renderTrains(trains) {
                 </div>
             </div>
             
-            <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')">🔔 Kuzatuvni yoqish</button>
+            <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
         </div>`;
     }).join('');
 }
@@ -470,7 +630,7 @@ async function addWatch(num) {
     if (btn.disabled || btn.classList.contains('added')) return;
 
     btn.disabled = true;
-    btn.innerText = "⌛ Qo'shilmoqda...";
+    btn.innerText = i18n('wait');
 
     const r = await fetch('/api/subs', { method: 'POST', body: JSON.stringify({
         user_id: tg.initDataUnsafe?.user?.id || 0,
@@ -482,18 +642,17 @@ async function addWatch(num) {
     }) });
     const res = await r.json();
     if (res.ok) { 
-        btn.innerText = "✅ Qo'shildi";
+        btn.innerText = i18n('added');
         btn.classList.add('added');
         btn.disabled = true;
         
-        // Badge raqamini darhol yangilash
         const badge = document.getElementById('sub-badge');
         let currentCount = parseInt(badge.innerText) || 0;
         badge.innerText = currentCount + 1;
         badge.style.display = 'block';
     } else { 
         btn.disabled = false;
-        btn.innerText = "🔔 Kuzatuvni yoqish";
+        btn.innerText = i18n('start_monitor');
         tg.showAlert(res.error); 
     }
 }
@@ -506,10 +665,10 @@ async function loadSubs() {
     
     const ps = document.getElementById('p-status');
     if (isPremium) {
-        ps.innerHTML = `<span>Premium: Faol</span> <span>📅 ${d.premium_until}</span>`;
+        ps.innerHTML = `<span>Premium: ✅</span> <span>📅 ${d.premium_until}</span>`;
         ps.style.background = 'linear-gradient(90deg, #34C759 0%, #2EA6FF 100%)';
     } else {
-        ps.innerHTML = `<span>Holat: Oddiy</span> <span>⭐ 0</span>`;
+        ps.innerHTML = `<span data-i18n="status_oddiy">${i18n('status_oddiy')}</span> <span>⭐ 0</span>`;
         ps.style.background = 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)';
     }
 
@@ -523,7 +682,7 @@ async function loadSubs() {
 
     const w = document.getElementById('wlist');
     if (!d.subs || !d.subs.length) {
-        w.innerHTML = '<div class="loading">Kuzatuvlar yo\'q.</div>';
+        w.innerHTML = `<div class="loading">${i18n('empty_monitor')}</div>`;
     } else {
         w.innerHTML = d.subs.map(s => `
         <div class="sub-card">
