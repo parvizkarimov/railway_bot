@@ -849,51 +849,68 @@ async def handle_book_api(request):
         return web.json_response({"ok": False, "error": str(e)})
 
 async def verify_railway_login(login, password):
-    """Railway saytiga login/parol to'g'riligini tekshirish"""
+    """Railway saytiga login/parol to'g'riligini tekshirish - faqat Email (POCHTA) orqali"""
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        # Haqiqiy userdek ko'rinish uchun
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
         try:
-            logging.info(f"Strict Email Login check for {login}...")
-            # Resurslarni tejash
-            await page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
+            logging.info(f"Email login check for: {login}")
             
+            # CSS ni BLOKLAMAYMIZ - Angular sayt uchun kerak!
+            # Faqat rasmlarni bloklaymiz
+            await page.route("**/*.{png,jpg,jpeg,gif,woff,woff2,ttf,eot}", lambda route: route.abort())
+
             # 1. Login sahifasiga kirish
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=45000, wait_until="domcontentloaded")
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="networkidle")
+            logging.info("Login page loaded")
             
-            # 2. POCHTA bo'limiga o'tish (Majburiy)
-            try:
-                await page.click("div.login-type-item:has-text('POCHTA')", timeout=10000)
-                await page.wait_for_selector("input[placeholder*='Elektron']", timeout=10000)
-            except Exception as e:
-                logging.error(f"Pochta tab error: {e}")
-                # Agar tab topilmasa, baribir placeholderni qidirib ko'ramiz
+            # 2. POCHTA bo'limiga o'tish
+            # Login type tablaridan 2-sini (POCHTA) bosamiz
+            pochta_tab = page.locator("div.login-type-item", has_text="POCHTA")
+            await pochta_tab.first.click(timeout=10000)
+            logging.info("Clicked POCHTA tab")
             
-            # 3. Ma'lumotlarni kiritish
-            await page.fill("input[placeholder*='Elektron']", login)
-            await page.fill("input[type='password']", password)
+            # 3. Email inputi paydo bo'lishini kutish
+            email_input = await page.wait_for_selector(
+                "input[placeholder='Elektron pochta manzilini kiriting']",
+                timeout=10000
+            )
+            await email_input.fill(login)
+            logging.info(f"Filled email: {login}")
             
-            # 4. Kirish
-            await page.click("button.btn-primary:has-text('KIRISH')")
+            # 4. Parol kiritish
+            pass_input = await page.wait_for_selector(
+                "input[placeholder='Parolni kiriting']",
+                timeout=5000
+            )
+            await pass_input.fill(password)
+            logging.info("Filled password")
             
-            # 5. Natija
+            # 5. Kirish tugmasini kutish va bosish
+            await page.wait_for_selector("button.btn.btn-primary:not([disabled])", timeout=5000)
+            await page.click("button.btn.btn-primary")
+            logging.info("Clicked login button")
+            
+            # 6. Natijani tekshirish
             try:
                 await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
+                logging.info("Login SUCCESS")
                 return True, None
             except:
-                error_el = await page.query_selector(".alert-danger, .error-message, .mat-error, .invalid-feedback")
+                # Xatolik xabarini qidirish
+                error_el = await page.query_selector(".alert-danger, .invalid-feedback, .text-danger, .error")
                 if error_el:
-                    err_text = await error_el.inner_text()
-                    return False, err_text.strip()
+                    err_text = (await error_el.inner_text()).strip()
+                    logging.error(f"Login failed with error: {err_text}")
+                    return False, err_text
                 return False, "Login yoki parol noto'g'ri."
             
         except Exception as e:
-            logging.error(f"Login error: {e}")
-            return False, f"Sayt bilan bog'lanishda xato."
+            logging.error(f"Login exception: {type(e).__name__}: {e}")
+            return False, f"Xato: {type(e).__name__} - {str(e)[:80]}"
         finally:
             await browser.close()
 
