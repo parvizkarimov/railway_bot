@@ -915,8 +915,7 @@ async def verify_railway_login(login, password):
             if not email_input:
                 return False, "Email kiritish maydoni topilmadi. Sayt o'zgargan bo'lishi mumkin."
 
-            await email_input.triple_click()
-            await email_input.type(login, delay=50)
+            await email_input.fill(login)
             logging.info("Email filled")
 
             # 4. Parol inputini topish
@@ -938,8 +937,7 @@ async def verify_railway_login(login, password):
             if not pass_input:
                 return False, "Parol kiritish maydoni topilmadi."
 
-            await pass_input.triple_click()
-            await pass_input.type(password, delay=50)
+            await pass_input.fill(password)
             logging.info("Password filled")
 
             # 5. Kirish tugmasini bosish
