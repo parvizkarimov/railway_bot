@@ -1019,6 +1019,7 @@
                             </div>
                         </div>
                         <button class="btn-main" onclick="saveProfile()" style="background: var(--accent-green);" data-i18n="save_btn">Saqlash</button>
+                        <button class="btn-main" onclick="logout()" style="background: transparent; color: #ff3b30; border: 1px solid #ff3b30; margin-top: 15px; box-shadow: none;" data-i18n="logout_btn">Profildan chiqish</button>
                     </div>
                 </div>
             </div>
@@ -1161,7 +1162,7 @@
                 nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
                 save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
                 eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Pochta (Email)", eticket_pass: "Parol",
-                checking: "Tekshirilmoqda...", verify_btn: "Tekshirish va Davom etish"
+                checking: "Tekshirilmoqda...", verify_btn: "Tekshirish va Davom etish", logout_btn: "Profildan chiqish"
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1417,6 +1418,22 @@
                 tg.MainButton.hideProgress();
                 tg.MainButton.hide();
             }
+        }
+
+        async function logout() {
+            tg.showConfirm(i18n('logout_btn') + "?", async (ok) => {
+                if (!ok) return;
+                const uid = tg.initDataUnsafe?.user?.id || 0;
+                const r = await fetch(`/api/logout?user_id=${uid}`);
+                const res = await r.json();
+                if (res.ok) {
+                    document.getElementById('prof-login').value = '';
+                    document.getElementById('prof-pass').value = '';
+                    document.getElementById('passenger-fields').style.display = 'none';
+                    document.getElementById('auth-fields').style.display = 'block';
+                    tg.showAlert(i18n('logout_btn'));
+                }
+            });
         }
 
         function swap() {

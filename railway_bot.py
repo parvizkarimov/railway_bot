@@ -924,6 +924,11 @@ async def handle_profile_api(request):
                  (int(uid), b.get('name'), b.get('passport'), b.get('birth'), login, password))
         return web.json_response({"ok": True})
 
+async def handle_logout_api(request):
+    uid = request.query.get("user_id")
+    await db("UPDATE users SET r_login=NULL, r_password=NULL WHERE user_id=?", (int(uid),))
+    return web.json_response({"ok": True})
+
 async def run_auto_booking(sub_id):
     """Orqa fonda Playwright orqali avtomatik olish mantiqi"""
     logging.info(f"Auto-booking started for sub: {sub_id}")
@@ -1033,6 +1038,7 @@ async def start_webserver():
     app.router.add_post("/api/book", handle_book_api)
     app.router.add_get("/api/profile", handle_profile_api)
     app.router.add_post("/api/profile", handle_profile_api)
+    app.router.add_get("/api/logout", handle_logout_api)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
