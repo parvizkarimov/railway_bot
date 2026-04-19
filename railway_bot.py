@@ -751,7 +751,7 @@ async def del_sub(cb: types.CallbackQuery):
 
 # ---- Checker Logic ----
 async def process_subscription(sub, now):
-    sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num = sub
+    sid, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num, s_auto_book = sub
     logging.info(f"Checking sub {sid} for user {uid} ({f_st}->{t_st}, {s_date}, reys: {s_train_num})")
     
     # API so'rovi
@@ -805,13 +805,9 @@ async def process_subscription(sub, now):
         msg = f"🔔 <b>Bo'sh joy topildi!</b>\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
         try: 
             await bot.send_message(uid, msg, parse_mode="HTML")
-            # Avtomatik olish yoqilgan bo'lsa
-            if sub[10]: # sub[10] = auto_book (id, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num, ..., auto_book)
-                # sub indexlarini tekshirish: SELECT id(0), user_id(1), from_st(2), to_st(3), from_code(4), to_code(5), date(6), check_interval(7), preferred_seats(8), max_price(9), train_num(10), ..., auto_book(13)
-                # Checker dagi subs query: SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num, auto_book FROM ...
-                if sub[11]: # auto_book (11-index)
-                    await bot.send_message(uid, "⚡️ <b>Avtomatik olish boshlandi...</b>\nIltimos, kuting.", parse_mode="HTML")
-                    asyncio.create_task(run_auto_booking(sid))
+            if s_auto_book:
+                await bot.send_message(uid, "⚡️ <b>Avtomatik olish boshlandi...</b>\nIltimos, kuting.", parse_mode="HTML")
+                asyncio.create_task(run_auto_booking(sid))
         except Exception as e: logging.error(f"Xabar yuborishda xato: {e}")
     else:
         logging.info(f"Sub {sid}: Bo'sh joy topilmadi")
@@ -833,8 +829,13 @@ async def checker():
             if subs:
                 tasks = []
                 for sub in subs:
-                    # Muddatni tekshirish
-                    if sub[6] < datetime.now().strftime("%Y-%m-%d"):
+                    # Muddatni tekshirish (YYYY-MM-DD vs YYYY-MM-DD)
+                    sub_date = sub[6]
+                    if '-' not in sub_date and '.' in sub_date: # DD.MM.YYYY -> YYYY-MM-DD
+                        p = sub_date.split('.')
+                        sub_date = f"{p[2]}-{p[1]}-{p[0]}"
+                    
+                    if sub_date < datetime.now().strftime("%Y-%m-%d"):
                         await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub[0],))
                         continue
                     tasks.append(throttled_process(sub, now))
@@ -927,7 +928,7 @@ async def handle_add_sub(request):
         # Yangi ID ni olish va darhol tekshiruvni boshlash
         last_id = await db("SELECT last_insert_rowid()", fetch=True)
         if last_id:
-            new_sub = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE id=?", (last_id[0][0],), fetch=True)
+            new_sub = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num, auto_book FROM subscriptions WHERE id=?", (last_id[0][0],), fetch=True)
             if new_sub:
                 asyncio.create_task(process_subscription(new_sub[0], int(time.time())))
 
@@ -1300,7 +1301,11 @@ async def run_auto_booking(sub_id, passenger_data=None):
 
             # ── 2. POYEZD QIDIRISH ───────────────────────────────────────
             await bot.send_message(uid, "2️⃣ Poyezd qidirilmoqda...")
-            url = f"https://eticket.railway.uz/uz/pages/trains-page?date={date}&from={f_code}&to={t_code}"
+            search_date = date
+            if '-' in date:
+                p = date.split('-')
+                search_date = f"{p[2]}.{p[1]}.{p[0]}"
+            url = f"https://eticket.railway.uz/uz/pages/trains-page?date={search_date}&from={f_code}&to={t_code}"
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(5000)
             
@@ -1417,7 +1422,7 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 () => {
                     for (const btn of document.querySelectorAll('button')) {
                         const t = btn.textContent.trim();
-                        if (t.includes('Tasdiqlash') || t.includes('Confirm') || t.includes('To\'lov')) { btn.click(); return; }
+                        if (t.includes('Tasdiqlash') || t.includes('Confirm') || t.includes("To'lov")) { btn.click(); return; }
                     }
                 }
             """)
