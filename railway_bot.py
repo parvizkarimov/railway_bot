@@ -1313,6 +1313,7 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 () => {{
                     const num = '{t_num}';
                     const allEls = document.querySelectorAll('*');
+                    // 1. Aniq raqam bo'yicha qidirish
                     for (const el of allEls) {{
                         if (el.children.length === 0 && el.textContent.trim() === num) {{
                             const card = el.closest('li, tr, [class*="train"], [class*="item"], [class*="card"]');
@@ -1322,63 +1323,90 @@ async def run_auto_booking(sub_id, passenger_data=None):
                             }}
                         }}
                     }}
-                    const firstBtn = document.querySelector('[class*="train-item"] button, [class*="train_item"] button');
+                    // 2. Birinchi poyezdni olish (fallback)
+                    const firstBtn = document.querySelector('[class*="train-item"] button, [class*="train_item"] button, .train-list button');
                     if (firstBtn) {{ firstBtn.click(); return 'first_train'; }}
                     return false;
                 }}
             """)
             logging.info(f"Train selection: {clicked}")
+            if not clicked:
+                await bot.send_message(uid, "❌ <b>Xato:</b> Poyezdlar ro'yxati topilmadi yoki bo'sh.")
+                return
             await page.wait_for_timeout(3000)
 
             # ── 3. VAGON TANLASH ─────────────────────────────────────────
             await bot.send_message(uid, "3️⃣ Vagon va o'rindiq tanlanmoqda...")
-            await page.evaluate("""
+            vagon_clicked = await page.evaluate("""
                 () => {
-                    const sels = ['[class*="wagon"]:not(.disabled)', '[class*="car"]:not(.disabled)', '[class*="vagon"]:not(.disabled)'];
+                    const sels = ['[class*="wagon"]:not(.disabled)', '[class*="car"]:not(.disabled)', '[class*="vagon"]:not(.disabled)', '.wagon-item:not(.disabled)'];
                     for (const s of sels) {
-                        const el = document.querySelector(s);
-                        if (el) { el.click(); return; }
+                        const els = document.querySelectorAll(s);
+                        for (const el of els) {
+                            if (el.textContent.trim()) { el.click(); return true; }
+                        }
                     }
+                    return false;
                 }
             """)
+            if not vagon_clicked:
+                await bot.send_message(uid, "❌ <b>Xato:</b> Bo'sh vagon topilmadi.")
+                return
             await page.wait_for_timeout(2000)
             
             # O'rindiq tanlash
-            await page.evaluate("""
+            seat_clicked = await page.evaluate("""
                 () => {
-                    const sels = ['[class*="seat"]:not([class*="occupied"]):not([class*="sold"])', '[class*="place"]:not([class*="busy"]):not([class*="occupied"])'];
+                    const sels = ['[class*="seat"]:not([class*="occupied"]):not([class*="sold"])', '[class*="place"]:not([class*="busy"]):not([class*="occupied"])', '.seat-item:not(.busy)'];
                     for (const s of sels) {
                         const el = document.querySelector(s);
-                        if (el) { el.click(); return; }
+                        if (el) { el.click(); return true; }
                     }
+                    return false;
                 }
             """)
+            if not seat_clicked:
+                await bot.send_message(uid, "❌ <b>Xato:</b> Bo'sh o'rindiq topilmadi.")
+                return
             await page.wait_for_timeout(1000)
             
             # Davom etish
             await page.evaluate("""
                 () => {
                     for (const btn of document.querySelectorAll('button')) {
-                        if (btn.textContent.includes('Davom') || btn.textContent.includes('Continue')) { btn.click(); return; }
+                        const t = btn.textContent.toLowerCase();
+                        if (t.includes('davom') || t.includes('continue') || t.includes('keyingi')) { btn.click(); return; }
                     }
                 }
             """)
             await page.wait_for_timeout(3000)
 
             # ── 4. YO'LOVCHI MA'LUMOTLARI ─────────────────────────────────
+            if "passenger" not in page.url and "yo'lovchi" not in page.url.lower():
+                # Agar hali ham o'sha sahifada bo'lsak, yana bir bor Davom etishni bosamiz
+                await page.evaluate("""
+                    () => {
+                        const btn = document.querySelector('button.next-btn, button[class*="next"]');
+                        if (btn) btn.click();
+                    }
+                """)
+                await page.wait_for_timeout(2000)
+
             await bot.send_message(uid, "4️⃣ Yo'lovchi ma'lumotlari to'ldirilmoqda...")
             
             async def fill_field(selectors, value):
                 for sel in selectors:
-                    el = await page.query_selector(sel)
-                    if el and await el.is_visible():
-                        await el.fill(value)
-                        return True
+                    try:
+                        el = await page.query_selector(sel)
+                        if el and await el.is_visible():
+                            await el.fill(value)
+                            return True
+                    except: continue
                 return False
 
-            await fill_field(["input[placeholder='Familiya']", "input[placeholder*='Familiya']"], familiya)
-            await fill_field(["input[placeholder='Ism']", "input[placeholder*='Ism']"], ism)
-            await fill_field(["input[placeholder='KK/OO/YYYY']", "input[placeholder*='sana']"], birth_formatted)
+            await fill_field(["input[placeholder='Familiya']", "input[placeholder*='Familiya']", "input[formcontrolname='lastName']"], familiya)
+            await fill_field(["input[placeholder='Ism']", "input[placeholder*='Ism']", "input[formcontrolname='firstName']"], ism)
+            await fill_field(["input[placeholder='KK/OO/YYYY']", "input[placeholder*='sana']", "input[formcontrolname='birthday']"], birth_formatted)
             
             # Jins tanlash
             await page.evaluate("""
@@ -1386,24 +1414,25 @@ async def run_auto_booking(sub_id, passenger_data=None):
                     const radios = document.querySelectorAll('input[type="radio"]');
                     for (const r of radios) {
                         const lbl = document.querySelector(`label[for="${r.id}"]`);
-                        if (lbl && lbl.textContent.includes('Erkak')) { r.click(); return; }
+                        if (lbl && (lbl.textContent.includes('Erkak') || lbl.textContent.includes('Male'))) { r.click(); return; }
                     }
                     if (radios.length > 0) radios[0].click();
                 }
             """)
             
-            await fill_field(["input[placeholder*='__']", "input[placeholder*='seriya']", "input[placeholder*='hujjat']", "input[placeholder*='Pasport']"], f"{passport_series}{passport_number}")
+            await fill_field(["input[placeholder*='__']", "input[placeholder*='seriya']", "input[placeholder*='hujjat']", "input[placeholder*='Pasport']", "input[formcontrolname='documentNumber']"], f"{passport_series}{passport_number}")
             await page.wait_for_timeout(500)
 
             # Davom etish
             await page.evaluate("""
                 () => {
                     for (const btn of document.querySelectorAll('button')) {
-                        if (btn.textContent.includes('Davom') || btn.textContent.includes('Continue')) { btn.click(); return; }
+                        const t = btn.textContent.toLowerCase();
+                        if (t.includes('davom') || t.includes('continue') || t.includes('rasmiylashtirish')) { btn.click(); return; }
                     }
                 }
             """)
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(4000)
 
             # ── 5. TASDIQLASH ────────────────────────────────────────────
             await bot.send_message(uid, "5️⃣ Buyurtma tasdiqlanmoqda...")
@@ -1422,23 +1451,22 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 () => {
                     for (const btn of document.querySelectorAll('button')) {
                         const t = btn.textContent.trim();
-                        if (t.includes('Tasdiqlash') || t.includes('Confirm') || t.includes("To'lov")) { btn.click(); return; }
+                        if (t.includes('Tasdiqlash') || t.includes('Confirm') || t.includes("To'lov") || t.includes("O'tish")) { btn.click(); return; }
                     }
                 }
             """)
-            await page.wait_for_timeout(5000)
+            await page.wait_for_timeout(6000)
 
             # ── 6. TO'LOV SAHIFASI — KARTA SO'RASH ───────────────────────
             final_url = page.url
             logging.info(f"Payment URL: {final_url}")
 
-            if "payment" not in final_url and "to-lov" not in final_url and "pay" not in final_url:
-                # To'lov sahifasiga o'tilmagan bo'lsa URL yuboramiz
+            if "payment" not in final_url and "to-lov" not in final_url and "pay" not in final_url and "checkout" not in final_url:
                 await bot.send_message(
                     uid,
-                    f"✅ <b>Chipta band qilindi!</b>\n\n"
-                    f"💳 <b>To'lov sahifasi:</b>\n{final_url}\n\n"
-                    f"⚠️ <i>15 daqiqa ichida to'lov qiling!</i>",
+                    f"❌ <b>To'lov sahifasiga o'ta olmadim.</b>\n\n"
+                    f"Ehtimol, joy allaqachon band qilingan yoki xatolik yuz berdi.\n"
+                    f"Sahifa: {final_url}",
                     parse_mode="HTML"
                 )
             else:
