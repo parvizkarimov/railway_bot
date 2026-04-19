@@ -899,8 +899,6 @@ async def verify_railway_login(login, password):
             return False, f"Ulanishda xato: {str(e)[:50]}", False
         finally:
             await browser.close()
-        finally:
-            await browser.close()
 
 async def handle_profile_api(request):
     uid = request.query.get("user_id")
