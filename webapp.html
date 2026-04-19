@@ -625,15 +625,17 @@
             margin-top: 15px;
             width: 100% !important;
             display: block !important;
-            padding: 14px;
+            padding: 16px !important;
             background: transparent;
             border: 2px solid var(--tg-btn);
             color: var(--tg-btn);
             border-radius: 16px;
-            font-size: 15px;
+            font-size: 16px !important;
             font-weight: 700;
             cursor: pointer;
+            text-align: center;
             transition: all 0.2s;
+            box-sizing: border-box;
         }
 
         .btn-track.added {
@@ -970,58 +972,54 @@
                 </div>
             </div>
 
-            <!-- Profile Section -->
             <div id="profile-section" class="section">
                 <div class="glass-card">
-                    <h2 style="margin-bottom: 20px;" data-i18n="profile_title">Mening ma'lumotlarim</h2>
-                    <p style="opacity: 0.6; font-size: 13px; margin-bottom: 20px;" data-i18n="profile_desc">
-                        Avtomatik olish (Auto-book) uchun pasport ma'lumotlaringizni to'g'ri kiriting.
-                    </p>
+                    <h2 style="margin-bottom: 20px;" data-i18n="profile_title">Mening ma'mulotlarim</h2>
                     
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="passenger_name">F.I.SH (Pasport bo'yicha)</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">👤</span>
-                            <input type="text" id="prof-name" class="form-input" placeholder="ABDULLAYEV ABDULLA">
+                    <div id="auth-fields">
+                        <div class="form-label" data-i18n="eticket_auth">Eticket sayti uchun avtorizatsiya (Faqat Pochta)</div>
+                        <div class="form-group">
+                            <div class="input-wrapper">
+                                <span class="input-icon">📧</span>
+                                <input type="email" id="prof-login" class="form-input" placeholder="example@mail.com">
+                            </div>
                         </div>
+                        <div class="form-group">
+                            <div class="input-wrapper">
+                                <span class="input-icon">🔑</span>
+                                <input type="password" id="prof-pass" class="form-input" placeholder="Parol">
+                            </div>
+                        </div>
+                        <button class="btn-main" id="login-verify-btn" onclick="saveProfile()" data-i18n="verify_btn">Tekshirish va Davom etish</button>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="passenger_passport">Pasport seriya va raqami</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">🆔</span>
-                            <input type="text" id="prof-passport" class="form-input" placeholder="AA1234567">
+                    <div id="passenger-fields" style="display: none; border-top: 1px solid rgba(0,0,0,0.1); margin-top: 20px; padding-top: 20px;">
+                        <p style="opacity: 0.6; font-size: 13px; margin-bottom: 20px;" data-i18n="profile_desc">
+                            Avtomatik olish (Auto-book) uchun pasport ma'lumotlaringizni to'g'ri kiriting.
+                        </p>
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="passenger_name">F.I.SH (Pasport bo'yicha)</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">👤</span>
+                                <input type="text" id="prof-name" class="form-input" placeholder="ABDULLAYEV ABDULLA">
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="passenger_birth">Tug'ilgan sana</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">🎂</span>
-                            <input type="date" id="prof-birth" class="form-input">
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="passenger_passport">Pasport seriya va raqami</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">🆔</span>
+                                <input type="text" id="prof-passport" class="form-input" placeholder="AA1234567">
+                            </div>
                         </div>
-                    </div>
-
-                    <div style="height: 1px; background: rgba(0,0,0,0.05); margin: 20px 0;"></div>
-                    <h3 style="font-size: 14px; margin-bottom: 15px;" data-i18n="eticket_auth">Eticket.railway.uz kirish</h3>
-
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="eticket_login">Login (Telefon yoki Email)</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">📧</span>
-                            <input type="text" id="prof-login" class="form-input" placeholder="example@mail.com">
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="passenger_birth">Tug'ilgan sana</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">🎂</span>
+                                <input type="date" id="prof-birth" class="form-input">
+                            </div>
                         </div>
+                        <button class="btn-main" onclick="saveProfile()" style="background: var(--accent-green);" data-i18n="save_btn">Saqlash</button>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="eticket_pass">Parol</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">🔑</span>
-                            <input type="password" id="prof-pass" class="form-input" placeholder="******">
-                        </div>
-                    </div>
-
-                    <button class="btn-main" onclick="saveProfile()" data-i18n="save_btn">Saqlash</button>
                 </div>
             </div>
         </div> <!-- app-container end -->
@@ -1162,8 +1160,8 @@
                 passenger_birth: "Tug'ilgan sana", book_confirm: "Rasmiylashtirish", book_success: "Buyurtma qabul qilindi! Operator tez orada bog'lanadi.",
                 nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
                 save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
-                eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol",
-                checking: "Tekshirilmoqda..."
+                eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Pochta (Email)", eticket_pass: "Parol",
+                checking: "Tekshirilmoqda...", verify_btn: "Tekshirish va Davom etish"
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1378,6 +1376,11 @@
                 document.getElementById('prof-birth').value = d.p_birth || "";
                 document.getElementById('prof-login').value = d.r_login || "";
                 document.getElementById('prof-pass').value = d.r_password || "";
+                
+                if (d.r_login && d.r_password) {
+                    document.getElementById('passenger-fields').style.display = 'block';
+                    document.getElementById('auth-fields').style.display = 'none';
+                }
             }
         }
 
@@ -1400,6 +1403,10 @@
                 });
                 const res = await r.json();
                 if (res.ok) {
+                    if (login && password) {
+                        document.getElementById('passenger-fields').style.display = 'block';
+                        document.getElementById('auth-fields').style.display = 'none';
+                    }
                     tg.showAlert(i18n('profile_saved'));
                 } else {
                     tg.showAlert(res.error || "Xatolik yuz berdi");
@@ -1481,8 +1488,8 @@
                 </div>
             </div>
             
-            <div class="train-actions">
-                <button class="btn-track" style="width: 100%;" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
+            <div class="train-actions" style="width: 100%; display: block;">
+                <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
             </div>
         </div>`;
             }).join('');

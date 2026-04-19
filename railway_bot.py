@@ -858,31 +858,31 @@ async def verify_railway_login(login, password):
         )
         page = await context.new_page()
         try:
-            # 1. Login sahifasiga kirish
-            logging.info(f"Verifying login for {login}...")
+            logging.info(f"Strict Email Login check for {login}...")
             # Resurslarni tejash
             await page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
             
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="domcontentloaded")
-            await page.wait_for_selector("input[type='password']", timeout=20000)
+            # 1. Login sahifasiga kirish
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=45000, wait_until="domcontentloaded")
             
-            # 2. Login turini aniqlash va kiritish
-            if "@" in login:
-                try: await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
-                except: pass
-                await page.fill("input[placeholder*='Elektron']", login)
-            else:
-                await page.fill("input[placeholder*='+998']", login)
+            # 2. POCHTA bo'limiga o'tish (Majburiy)
+            try:
+                await page.click("div.login-type-item:has-text('POCHTA')", timeout=10000)
+                await page.wait_for_selector("input[placeholder*='Elektron']", timeout=10000)
+            except Exception as e:
+                logging.error(f"Pochta tab error: {e}")
+                # Agar tab topilmasa, baribir placeholderni qidirib ko'ramiz
             
-            # 3. Parolni kiritish
+            # 3. Ma'lumotlarni kiritish
+            await page.fill("input[placeholder*='Elektron']", login)
             await page.fill("input[type='password']", password)
             
-            # 4. Kirish tugmasini bosish
+            # 4. Kirish
             await page.click("button.btn-primary:has-text('KIRISH')")
             
-            # 5. Natijani tekshirish
+            # 5. Natija
             try:
-                await page.wait_for_url(lambda url: "login" not in url, timeout=25000)
+                await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
                 return True, None
             except:
                 error_el = await page.query_selector(".alert-danger, .error-message, .mat-error, .invalid-feedback")
@@ -892,8 +892,8 @@ async def verify_railway_login(login, password):
                 return False, "Login yoki parol noto'g'ri."
             
         except Exception as e:
-            logging.error(f"Login verify error for {login}: {e}")
-            return False, f"Sayt bilan bog'lanishda xato: {str(e)[:50]}"
+            logging.error(f"Login error: {e}")
+            return False, f"Sayt bilan bog'lanishda xato."
         finally:
             await browser.close()
 
