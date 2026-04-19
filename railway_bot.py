@@ -860,16 +860,15 @@ async def verify_railway_login(login, password):
         try:
             # 1. Login sahifasiga kirish
             logging.info(f"Verifying login for {login}...")
-            # Resurslarni tejash uchun rasm va stillarni yuklamaymiz
+            # Resurslarni tejash
             await page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
             
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=45000, wait_until="domcontentloaded")
-            await page.wait_for_selector("input[type='password']", timeout=15000)
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="domcontentloaded")
+            await page.wait_for_selector("input[type='password']", timeout=20000)
             
             # 2. Login turini aniqlash va kiritish
             if "@" in login:
-                try:
-                    await page.click("div.login-type-item:has-text('POCHTA')", timeout=3000)
+                try: await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
                 except: pass
                 await page.fill("input[placeholder*='Elektron']", login)
             else:
@@ -883,20 +882,18 @@ async def verify_railway_login(login, password):
             
             # 5. Natijani tekshirish
             try:
-                await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
-                return True, None, False
+                await page.wait_for_url(lambda url: "login" not in url, timeout=25000)
+                return True, None
             except:
                 error_el = await page.query_selector(".alert-danger, .error-message, .mat-error, .invalid-feedback")
                 if error_el:
                     err_text = await error_el.inner_text()
-                    return False, err_text.strip(), False
-                return False, "Login yoki parol noto'g'ri.", False
+                    return False, err_text.strip()
+                return False, "Login yoki parol noto'g'ri."
             
         except Exception as e:
             logging.error(f"Login verify error for {login}: {e}")
-            if "Timeout" in str(e):
-                return False, "Sayt juda sekin javob beryapti.", True
-            return False, f"Ulanishda xato: {str(e)[:50]}", False
+            return False, f"Sayt bilan bog'lanishda xato: {str(e)[:50]}"
         finally:
             await browser.close()
 
@@ -911,16 +908,20 @@ async def handle_profile_api(request):
         b = await request.json()
         login = b.get('login', '').strip()
         password = b.get('password', '').strip()
-        force = b.get('force', False)
         
-        # Agar login/parol kiritilgan bo'lsa va 'force' (majburiy) bo'lmasa, tekshirib ko'ramiz
-        if login and password and not force:
-            ok, err, is_timeout = await verify_railway_login(login, password)
+        # Qat'iy avtorizatsiya
+        if login and password:
+            ok, err = await verify_railway_login(login, password)
             if not ok:
-                return web.json_response({"ok": False, "error": err, "timeout": is_timeout})
+                return web.json_response({"ok": False, "error": err})
         
-        await db("UPDATE users SET p_name=?, p_passport=?, p_birth=?, r_login=?, r_password=? WHERE user_id=?", 
-                 (b.get('name'), b.get('passport'), b.get('birth'), login, password, int(uid)))
+        await db("""INSERT INTO users (user_id, p_name, p_passport, p_birth, r_login, r_password) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET 
+                    p_name=excluded.p_name, p_passport=excluded.p_passport, 
+                    p_birth=excluded.p_birth, r_login=excluded.r_login, 
+                    r_password=excluded.r_password""", 
+                 (int(uid), b.get('name'), b.get('passport'), b.get('birth'), login, password))
         return web.json_response({"ok": True})
 
 async def run_auto_booking(sub_id):

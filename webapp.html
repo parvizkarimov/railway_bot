@@ -623,15 +623,17 @@
 
         .btn-track {
             margin-top: 15px;
-            width: 100%;
-            padding: 12px;
+            width: 100% !important;
+            display: block !important;
+            padding: 14px;
             background: transparent;
             border: 2px solid var(--tg-btn);
             color: var(--tg-btn);
-            border-radius: 14px;
-            font-size: 14px;
+            border-radius: 16px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
         .btn-track.added {
@@ -1134,6 +1136,10 @@
         </div>
     </div>
 
+    <style>
+        .btn-track { width: 100% !important; display: block !important; }
+    </style>
+
     <script>
         const tg = window.Telegram.WebApp;
         let isPremium = false; // Global o'zgaruvchini e'lon qilamiz
@@ -1157,7 +1163,7 @@
                 nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
                 save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
                 eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol",
-                checking: "Tekshirilmoqda...", timeout_ask: "Sayt hozirda band. Ma'lumotlarni tekshirmasdan saqlashni xohlaysizmi?"
+                checking: "Tekshirilmoqda..."
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1375,7 +1381,7 @@
             }
         }
 
-        async function saveProfile(force = false) {
+        async function saveProfile() {
             const uid = tg.initDataUnsafe?.user?.id || 0;
             const name = document.getElementById('prof-name').value.trim();
             const passport = document.getElementById('prof-passport').value.trim();
@@ -1390,19 +1396,13 @@
             try {
                 const r = await fetch(`/api/profile?user_id=${uid}`, {
                     method: 'POST',
-                    body: JSON.stringify({ name, passport, birth, login, password, force })
+                    body: JSON.stringify({ name, passport, birth, login, password })
                 });
                 const res = await r.json();
                 if (res.ok) {
                     tg.showAlert(i18n('profile_saved'));
                 } else {
-                    if (res.timeout) {
-                        tg.showConfirm(i18n('timeout_ask'), (ok) => {
-                            if (ok) saveProfile(true);
-                        });
-                    } else {
-                        tg.showAlert(res.error || "Xatolik yuz berdi");
-                    }
+                    tg.showAlert(res.error || "Xatolik yuz berdi");
                 }
             } catch (e) {
                 tg.showAlert("Server bilan ulanishda xato!");
