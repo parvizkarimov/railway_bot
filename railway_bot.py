@@ -1313,25 +1313,45 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 () => {{
                     const num = '{t_num}';
                     const allEls = document.querySelectorAll('*');
+                    
                     // 1. Aniq raqam bo'yicha qidirish
                     for (const el of allEls) {{
-                        if (el.children.length === 0 && el.textContent.trim() === num) {{
-                            const card = el.closest('li, tr, [class*="train"], [class*="item"], [class*="card"]');
+                        const text = el.textContent.trim();
+                        if (el.children.length === 0 && (text === num || text.includes(num))) {{
+                            const card = el.closest('li, tr, [class*="train"], [class*="item"], [class*="card"], app-train-item');
                             if (card) {{
-                                const btn = card.querySelector('button');
-                                if (btn) {{ btn.click(); return 'found:' + num; }}
+                                const btn = card.querySelector('button, a.btn, .btn-primary');
+                                if (btn) {{ btn.click(); return 'found_num:' + num; }}
                             }}
                         }}
                     }}
-                    // 2. Birinchi poyezdni olish (fallback)
-                    const firstBtn = document.querySelector('[class*="train-item"] button, [class*="train_item"] button, .train-list button');
-                    if (firstBtn) {{ firstBtn.click(); return 'first_train'; }}
+
+                    // 2. "Poyezdni tanlash" matni bo'yicha qidirish
+                    for (const a of document.querySelectorAll('a, button')) {{
+                        if (a.textContent.includes('tanlash') || a.textContent.includes('Select')) {{
+                            a.click(); return 'found_text';
+                        }}
+                    }}
+
+                    // 3. Birinchi tugmani bosish (fallback)
+                    const selectors = [
+                        'app-train-item a.btn', 
+                        '.train-card a.btn', 
+                        '[class*="train"] a.btn', 
+                        '[class*="train"] button',
+                        'a.btn-primary'
+                    ];
+                    for (const s of selectors) {{
+                        const btn = document.querySelector(s);
+                        if (btn) {{ btn.click(); return 'found_selector:' + s; }}
+                    }}
+                    
                     return false;
                 }}
             """)
             logging.info(f"Train selection: {clicked}")
             if not clicked:
-                await bot.send_message(uid, "❌ <b>Xato:</b> Poyezdlar ro'yxati topilmadi yoki bo'sh.")
+                await bot.send_message(uid, "❌ <b>Xato:</b> Poyezdni tanlab bo'lmadi. (Selector topilmadi)")
                 return
             await page.wait_for_timeout(3000)
 
