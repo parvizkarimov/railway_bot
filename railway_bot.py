@@ -15,6 +15,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, WebAppInfo
 import json
 import re
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 
 # ---- Configuration ----
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip() or None
@@ -37,6 +39,10 @@ async def send_error_to_admin(msg):
 # Cookie cache
 _cookie_cache = {"cookie": "", "xsrf": "", "updated": None}
 COOKIE_TTL = 1500  # 25 daqiqa
+
+# To'lov jarayonidagi session'lar (xotirada, bazaga saqlanmaydi)
+# { user_id: { 'page': playwright_page, 'browser': browser, 'sub_id': int } }
+_payment_sessions: dict = {}
 
 # Barcha stansiyalar
 STATIONS = {
@@ -431,6 +437,188 @@ async def success_payment_handler(msg: types.Message):
                  f"⭐ Miqdori: {amount} yulduz\n"
                  f"📅 Yangi muddat: {new_until[:10]}")
     await send_error_to_admin(admin_msg)
+
+@dp.message(F.text & ~F.text.startswith('/'))
+async def handle_payment_text(msg: types.Message):
+    """Karta raqami yoki OTP kodni ushlab olish (to'lov jarayoni)"""
+    uid = msg.from_user.id
+    session = _payment_sessions.get(uid)
+    if not session:
+        return
+
+    page = session['page']
+    step = session['step']
+    text = msg.text.strip()
+
+    if step == 'card':
+        parts = text.split()
+        if len(parts) < 2:
+            await msg.answer("❌ Format: <code>XXXXXXXXXXXXXXXX MM/YY</code>", parse_mode="HTML")
+            return
+        card_num = parts[0].replace("-", "").replace(" ", "")
+        card_exp = parts[1]
+        if not card_num.isdigit() or len(card_num) < 16:
+            await msg.answer("❌ Karta raqami 16 ta raqam bo'lishi kerak.")
+            return
+
+        await msg.answer("⏳ Karta ma'lumotlari kiritilmoqda...")
+        try:
+            await page.evaluate(f"""
+                () => {{
+                    for (const inp of document.querySelectorAll('input')) {{
+                        const p = inp.placeholder || '';
+                        if (p.includes('____') || p.includes('Karta') || p.includes('card') || inp.maxLength >= 16) {{
+                            inp.focus(); inp.value = '{card_num}';
+                            inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+                            inp.dispatchEvent(new Event('change', {{bubbles:true}}));
+                            return true;
+                        }}
+                    }}
+                }}
+            """)
+            await page.wait_for_timeout(800)
+
+            exp_val = card_exp if '/' in card_exp else f"{card_exp[:2]}/{card_exp[2:]}"
+            await page.evaluate(f"""
+                () => {{
+                    for (const inp of document.querySelectorAll('input')) {{
+                        const p = inp.placeholder || '';
+                        if (p.includes('__/__') || p.includes('MM') || p.includes('muddat') || p.includes('Muddat')) {{
+                            inp.focus(); inp.value = '{exp_val}';
+                            inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+                            inp.dispatchEvent(new Event('change', {{bubbles:true}}));
+                            return true;
+                        }}
+                    }}
+                }}
+            """)
+            await page.wait_for_timeout(800)
+
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        const t = btn.textContent.trim();
+                        if (t.includes("To'lov") || t.includes("Tasdiqlash") || t.includes("To'la") || t.includes("Confirm")) {
+                            btn.click(); return;
+                        }
+                    }
+                    const sub = document.querySelector('button[type="submit"]');
+                    if (sub) sub.click();
+                }
+            """)
+            await page.wait_for_timeout(3000)
+            session['step'] = 'otp'
+            await msg.answer("📱 <b>SMS kod yuborildi!</b>\nTelefonga kelgan kodni yuboring:", parse_mode="HTML")
+        except Exception as e:
+            await msg.answer(f"❌ Xato: {str(e)[:100]}")
+            try: await session['browser'].close()
+            except: pass
+            _payment_sessions.pop(uid, None)
+
+    elif step == 'otp':
+        otp = text.replace(" ", "")
+        if not otp.isdigit():
+            await msg.answer("❌ Faqat raqamlardan iborat kod yuboring.")
+            return
+        await msg.answer("⏳ Kod kiritilmoqda, to'lov yakunlanmoqda...")
+        try:
+            otp_len = len(otp)
+            await page.evaluate(f"""
+                () => {{
+                    const inputs = [...document.querySelectorAll('input')];
+                    for (const inp of inputs) {{
+                        const p = inp.placeholder || '';
+                        if (p.includes('_ _') || p.includes('kod') || inp.maxLength === 6 || inp.maxLength === 4) {{
+                            inp.focus(); inp.value = '{otp}';
+                            inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+                            inp.dispatchEvent(new Event('change', {{bubbles:true}}));
+                            return 'single';
+                        }}
+                    }}
+                    const singles = inputs.filter(i => i.maxLength === 1);
+                    if (singles.length >= {otp_len}) {{
+                        for (let i = 0; i < {otp_len}; i++) {{
+                            singles[i].focus(); singles[i].value = '{otp}'[i];
+                            singles[i].dispatchEvent(new Event('input', {{bubbles:true}}));
+                        }}
+                        return 'multi';
+                    }}
+                }}
+            """)
+            await page.wait_for_timeout(1500)
+
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        const t = btn.textContent.trim();
+                        if (t.includes("Tasdiqlash") || t.includes("Confirm") || t.includes("To'lash") || t.includes("OK") || t.includes("Davom")) {
+                            btn.click(); return;
+                        }
+                    }
+                    const sub = document.querySelector('button[type="submit"]');
+                    if (sub) sub.click();
+                }
+            """)
+            await page.wait_for_timeout(6000)
+
+            current_url = page.url
+            ticket_info = await page.evaluate("""
+                () => {
+                    const body = document.body.innerText;
+                    const m = body.match(/\b\d{8,14}\b/);
+                    return { ticket: m ? m[0] : null };
+                }
+            """)
+
+            pdf_sent = False
+            try:
+                pdf_url = await page.evaluate("""
+                    () => {
+                        for (const a of document.querySelectorAll('a')) {
+                            if (a.href.includes('.pdf') || a.href.includes('download') ||
+                                a.textContent.includes('PDF') || a.textContent.includes('Yuklab')) {
+                                return a.href;
+                            }
+                        }
+                        return null;
+                    }
+                """)
+                if pdf_url:
+                    cookies = await page.context.cookies()
+                    cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
+                    async with aiohttp.ClientSession() as http:
+                        async with http.get(pdf_url, headers={"Cookie": cookie_str}) as resp:
+                            if resp.status == 200:
+                                pdf_bytes = await resp.read()
+                                from io import BytesIO
+                                await bot.send_document(
+                                    uid,
+                                    types.BufferedInputFile(pdf_bytes, filename="chipta.pdf"),
+                                    caption="🎟️ <b>Elektron chiptangiz tayyor!</b>",
+                                    parse_mode="HTML"
+                                )
+                                pdf_sent = True
+            except Exception as pdf_err:
+                logging.error(f"PDF error: {pdf_err}")
+
+            ticket_num = ticket_info.get('ticket', '')
+            await msg.answer(
+                f"✅ <b>To'lov muvaffaqiyatli yakunlandi!</b>\n\n"
+                + (f"🎟️ Chipta: <code>{ticket_num}</code>\n" if ticket_num else "")
+                + (f"📄 PDF chipta yuborildi.\n" if pdf_sent else f"🔗 <a href='{current_url}'>Chipta sahifasi</a>\n")
+                + "\n✈️ Yaxshi yo'l!",
+                parse_mode="HTML"
+            )
+            sub_id = session.get('sub_id')
+            if sub_id:
+                await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub_id,))
+        except Exception as e:
+            await msg.answer(f"❌ OTP xato: {str(e)[:150]}")
+        finally:
+            try: await session['browser'].close()
+            except: pass
+            _payment_sessions.pop(uid, None)
+
 
 @dp.message(Command("users"))
 async def cmd_admin_users(msg: types.Message):
@@ -1235,24 +1423,47 @@ async def run_auto_booking(sub_id, passenger_data=None):
             """)
             await page.wait_for_timeout(5000)
 
-            # ── 6. TO'LOV URL ────────────────────────────────────────────
+            # ── 6. TO'LOV SAHIFASI — KARTA SO'RASH ───────────────────────
             final_url = page.url
-            logging.info(f"Final URL: {final_url}")
-            
-            await bot.send_message(
-                uid,
-                f"✅ <b>Chipta muvaffaqiyatli band qilindi!</b>\n\n"
-                f"💳 <b>To'lov uchun havolani oching:</b>\n{final_url}\n\n"
-                f"⚠️ <i>15 daqiqa ichida to'lov qilmasangiz, joy bekor qilinadi!</i>",
-                parse_mode="HTML"
-            )
-            await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub_id,))
+            logging.info(f"Payment URL: {final_url}")
+
+            if "payment" not in final_url and "to-lov" not in final_url and "pay" not in final_url:
+                # To'lov sahifasiga o'tilmagan bo'lsa URL yuboramiz
+                await bot.send_message(
+                    uid,
+                    f"✅ <b>Chipta band qilindi!</b>\n\n"
+                    f"💳 <b>To'lov sahifasi:</b>\n{final_url}\n\n"
+                    f"⚠️ <i>15 daqiqa ichida to'lov qiling!</i>",
+                    parse_mode="HTML"
+                )
+            else:
+                # Browser session ni _payment_sessions ga saqlab qo'yamiz
+                # (browser hali yopilmaydi — finally da ham yopmaymiz)
+                _payment_sessions[uid] = {
+                    'page': page,
+                    'browser': browser,
+                    'context': context,
+                    'sub_id': sub_id,
+                    'step': 'card'
+                }
+                # Botdan karta ma'lumotlarini so'raymiz
+                await bot.send_message(
+                    uid,
+                    "💳 <b>To'lov sahifasiga yetib keldik!</b>\n\n"
+                    "Karta raqami va amal qilish muddatini yuboring:\n"
+                    "<code>XXXXXXXXXXXXXXXX MM/YY</code>\n\n"
+                    "<i>Misol: 8600123456789012 08/26</i>",
+                    parse_mode="HTML"
+                )
+                return  # browser yopilmaydi, finally o'tkazib yuboriladi
                 
         except Exception as e:
             logging.error(f"Auto-booking error [{type(e).__name__}]: {e}")
             await bot.send_message(uid, f"❌ <b>Xato:</b>\n<code>{type(e).__name__}: {str(e)[:150]}</code>", parse_mode="HTML")
         finally:
-            await browser.close()
+            # Agar _payment_sessions da bo'lsa — browser ni YOPMAYMIZ
+            if uid not in _payment_sessions:
+                await browser.close()
 
 async def handle_autobook_api(request):
     """WebApp dan kelgan bron so'rovini qayta ishlash"""
