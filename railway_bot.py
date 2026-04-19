@@ -1309,30 +1309,27 @@ async def run_auto_booking(sub_id, passenger_data=None):
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(5000)
             
-            clicked = await page.evaluate(f"""
-                () => {{
-                    const num = '{t_num}';
-                    const trainCards = document.querySelectorAll('app-train-item, li.train-item, .train-card, [class*="train-item"], [class*="train-list"] > div, [class*="train"]');
-                    
-                    for (const card of trainCards) {{
-                        if (card.textContent.includes(num)) {{
-                            const btn = card.querySelector('a.btn.btn-primary, button.btn-primary, button, a.btn');
-                            if (btn && (btn.textContent.includes('tanlash') || btn.textContent.includes('Select') || btn.textContent.includes('Выбрать'))) {{
-                                btn.click(); 
-                                return 'found_num:' + num;
-                            }}
-                            if (btn && !btn.disabled) {{
-                                btn.click();
-                                return 'found_num:' + num;
-                            }}
-                        }}
-                    }}
-                    return false;
-                }}
-            """)
-            logging.info(f"Train selection: {clicked}")
-            if not clicked:
-                await bot.send_message(uid, "❌ <b>Xato:</b> Poyezdni tanlab bo'lmadi. (Selector topilmadi)")
+            train_items = await page.query_selector_all('app-train-item, li.train-item, .train-card, [class*="train-item"]')
+            clicked_train = False
+            for item in train_items:
+                text = await item.inner_text()
+                if t_num in text or t_num.lstrip('0') in text:
+                    btn = await item.query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
+                    if btn:
+                        await btn.click()
+                        clicked_train = True
+                        break
+            
+            if not clicked_train:
+                # Agar aniq raqam bilan topolmasa, birinchi kelgan poyezdni tanlaymiz (ehtiyot chorasi)
+                if train_items:
+                    btn = await train_items[0].query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
+                    if btn:
+                        await btn.click()
+                        clicked_train = True
+            
+            if not clicked_train:
+                await bot.send_message(uid, f"❌ <b>Xato:</b> {t_num} poyezdni tanlab bo'lmadi. (Selector topilmadi)")
                 return
             await page.wait_for_timeout(3000)
 
