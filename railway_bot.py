@@ -852,27 +852,47 @@ async def verify_railway_login(login, password):
     """Railway saytiga login/parol to'g'riligini tekshirish"""
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
+        # Haqiqiy userdek ko'rinish uchun
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        )
         page = await context.new_page()
         try:
-            await page.goto("https://eticket.railway.uz/uz/pages/login", timeout=30000)
-            await page.fill("input[name='login']", login)
-            await page.fill("input[name='password']", password)
-            await page.click("button[type='submit']")
+            # 1. Login sahifasiga kirish
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=40000)
             await page.wait_for_load_state("networkidle")
             
-            # Agar login xato bo'lsa, xatolik xabari chiqadi yoki login sahifasida qoladi
-            # Muvaffaqiyatli bo'lsa, /profile yoki asosiy sahifaga o'tadi
-            if "login" in page.url:
-                # Saytdagi xatolik xabarini qidirish
-                error = await page.query_selector(".alert-danger")
-                if error:
-                    err_text = await error.inner_text()
+            # 2. Login turini aniqlash va kiritish
+            if "@" in login:
+                # Pochta orqali kirish
+                try:
+                    await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
+                except: pass
+                await page.fill("input[placeholder*='Elektron']", login)
+            else:
+                # Telefon orqali kirish
+                await page.fill("input[placeholder*='+998']", login)
+            
+            # 3. Parolni kiritish
+            await page.fill("input[type='password']", password)
+            
+            # 4. Kirish tugmasini bosish
+            await page.click("button.btn-primary:has-text('KIRISH')")
+            await page.wait_for_load_state("networkidle")
+            
+            # 5. Natijani tekshirish
+            current_url = page.url
+            if "login" in current_url:
+                error_el = await page.query_selector(".alert-danger, .error-message, .mat-error")
+                if error_el:
+                    err_text = await error_el.inner_text()
                     return False, err_text.strip()
-                return False, "Login yoki parol xato."
+                return False, "Login yoki parol noto'g'ri."
+            
             return True, None
         except Exception as e:
-            return False, f"Ulanishda xato: {e}"
+            logging.error(f"Login verify error: {e}")
+            return False, f"Sayt bilan bog'lanishda xato yuz berdi (Timeout)."
         finally:
             await browser.close()
 
@@ -915,16 +935,24 @@ async def run_auto_booking(sub_id):
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        )
         page = await context.new_page()
         
         try:
             # 2. Avtorizatsiya (Login)
-            await page.goto("https://eticket.railway.uz/uz/pages/login", timeout=60000)
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000)
             if r_login and r_pass:
-                await page.fill("input[name='login']", r_login)
-                await page.fill("input[name='password']", r_pass)
-                await page.click("button[type='submit']")
+                if "@" in r_login:
+                    try: await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
+                    except: pass
+                    await page.fill("input[placeholder*='Elektron']", r_login)
+                else:
+                    await page.fill("input[placeholder*='+998']", r_login)
+                
+                await page.fill("input[type='password']", r_pass)
+                await page.click("button.btn-primary:has-text('KIRISH')")
                 await page.wait_for_load_state("networkidle")
             
             # 3. Qidiruv sahifasiga o'tish
