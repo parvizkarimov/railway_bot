@@ -1312,40 +1312,21 @@ async def run_auto_booking(sub_id, passenger_data=None):
             clicked = await page.evaluate(f"""
                 () => {{
                     const num = '{t_num}';
-                    const allEls = document.querySelectorAll('*');
+                    const trainCards = document.querySelectorAll('app-train-item, li.train-item, .train-card, [class*="train-item"], [class*="train-list"] > div, [class*="train"]');
                     
-                    // 1. Aniq raqam bo'yicha qidirish
-                    for (const el of allEls) {{
-                        const text = el.textContent.trim();
-                        if (el.children.length === 0 && (text === num || text.includes(num))) {{
-                            const card = el.closest('li, tr, [class*="train"], [class*="item"], [class*="card"], app-train-item');
-                            if (card) {{
-                                const btn = card.querySelector('button, a.btn, .btn-primary');
-                                if (btn) {{ btn.click(); return 'found_num:' + num; }}
+                    for (const card of trainCards) {{
+                        if (card.textContent.includes(num)) {{
+                            const btn = card.querySelector('a.btn.btn-primary, button.btn-primary, button, a.btn');
+                            if (btn && (btn.textContent.includes('tanlash') || btn.textContent.includes('Select') || btn.textContent.includes('Выбрать'))) {{
+                                btn.click(); 
+                                return 'found_num:' + num;
+                            }}
+                            if (btn && !btn.disabled) {{
+                                btn.click();
+                                return 'found_num:' + num;
                             }}
                         }}
                     }}
-
-                    // 2. "Poyezdni tanlash" matni bo'yicha qidirish
-                    for (const a of document.querySelectorAll('a, button')) {{
-                        if (a.textContent.includes('tanlash') || a.textContent.includes('Select')) {{
-                            a.click(); return 'found_text';
-                        }}
-                    }}
-
-                    // 3. Birinchi tugmani bosish (fallback)
-                    const selectors = [
-                        'app-train-item a.btn', 
-                        '.train-card a.btn', 
-                        '[class*="train"] a.btn', 
-                        '[class*="train"] button',
-                        'a.btn-primary'
-                    ];
-                    for (const s of selectors) {{
-                        const btn = document.querySelector(s);
-                        if (btn) {{ btn.click(); return 'found_selector:' + s; }}
-                    }}
-                    
                     return false;
                 }}
             """)
@@ -1359,11 +1340,14 @@ async def run_auto_booking(sub_id, passenger_data=None):
             await bot.send_message(uid, "3️⃣ Vagon va o'rindiq tanlanmoqda...")
             vagon_clicked = await page.evaluate("""
                 () => {
-                    const sels = ['[class*="wagon"]:not(.disabled)', '[class*="car"]:not(.disabled)', '[class*="vagon"]:not(.disabled)', '.wagon-item:not(.disabled)'];
+                    const sels = ['app-car-item', '.car-item', '[class*="wagon"]:not(.disabled)', '[class*="car"]:not(.disabled)', '.wagon-item:not(.disabled)'];
                     for (const s of sels) {
                         const els = document.querySelectorAll(s);
                         for (const el of els) {
-                            if (el.textContent.trim()) { el.click(); return true; }
+                            if (el.textContent.trim() && !el.classList.contains('disabled')) { 
+                                el.click(); 
+                                return true; 
+                            }
                         }
                     }
                     return false;
@@ -1372,21 +1356,57 @@ async def run_auto_booking(sub_id, passenger_data=None):
             if not vagon_clicked:
                 await bot.send_message(uid, "❌ <b>Xato:</b> Bo'sh vagon topilmadi.")
                 return
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
             
             # O'rindiq tanlash
-            seat_clicked = await page.evaluate("""
-                () => {
-                    const sels = ['[class*="seat"]:not([class*="occupied"]):not([class*="sold"])', '[class*="place"]:not([class*="busy"]):not([class*="occupied"])', '.seat-item:not(.busy)'];
-                    for (const s of sels) {
-                        const el = document.querySelector(s);
-                        if (el) { el.click(); return true; }
-                    }
-                    return false;
-                }
+            safe_prefs = prefs_json if prefs_json else "[]"
+            seat_clicked = await page.evaluate(f"""
+                () => {{
+                    const prefs = {safe_prefs};
+                    const sels = ['.seat-available', '.place-item:not(.occupied)', '.seat-item:not(.busy)', '[class*="seat"]:not([class*="occupied"]):not([class*="sold"])', '[class*="place"]:not([class*="busy"]):not([class*="occupied"])'];
+                    
+                    let allSeats = [];
+                    for (const s of sels) {{
+                        const els = document.querySelectorAll(s);
+                        if (els.length > 0) {{
+                            allSeats = Array.from(els);
+                            break;
+                        }}
+                    }}
+
+                    if (allSeats.length === 0) return false;
+
+                    for (const el of allSeats) {{
+                        const text = el.textContent.trim();
+                        const numMatch = text.match(/[0-9]+/);
+                        if (numMatch) {{
+                            const num = parseInt(numMatch[0]);
+                            const isLower = (num % 2 !== 0); // Toq - pastki
+                            const isUpper = (num % 2 === 0); // Juft - tepadagi
+
+                            let match = false;
+                            if (!prefs || prefs.length === 0) match = true;
+                            else if (prefs.includes('lower') && isLower) match = true;
+                            else if (prefs.includes('upper') && isUpper) match = true;
+                            else if (prefs.includes('sitting')) match = true;
+
+                            if (match) {{
+                                el.click();
+                                return true;
+                            }}
+                        }} else {{
+                            // Raqam yo'q bo'lsa
+                            if (!prefs || prefs.length === 0 || prefs.includes('sitting')) {{
+                                el.click();
+                                return true;
+                            }}
+                        }}
+                    }}
+                    return false; // Talab qilingan o'rindiq turi topilmadi
+                }}
             """)
             if not seat_clicked:
-                await bot.send_message(uid, "❌ <b>Xato:</b> Bo'sh o'rindiq topilmadi.")
+                await bot.send_message(uid, "❌ <b>Xato:</b> Siz xohlagan turdagi bo'sh o'rindiq (pastki/tepa) topilmadi.")
                 return
             await page.wait_for_timeout(1000)
             
