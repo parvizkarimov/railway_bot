@@ -1028,7 +1028,244 @@ async def handle_logout_api(request):
     await db("UPDATE users SET r_login=NULL, r_password=NULL WHERE user_id=?", (int(uid),))
     return web.json_response({"ok": True})
 
-async def run_auto_booking(sub_id):
+async def run_auto_booking(sub_id, passenger_data=None):
+    """Orqa fonda Playwright orqali to'liq avtomatik chipta olish jarayoni"""
+    logging.info(f"Auto-booking started for sub: {sub_id}")
+    
+    sub_rows = await db(
+        "SELECT user_id, from_code, to_code, date, train_num, preferred_seats FROM subscriptions WHERE id=?",
+        (sub_id,), fetch=True
+    )
+    if not sub_rows: return
+    uid, f_code, t_code, date, t_num, prefs_json = sub_rows[0]
+    
+    user_rows = await db(
+        "SELECT p_name, p_passport, p_birth, r_login, r_password FROM users WHERE user_id=?",
+        (uid,), fetch=True
+    )
+    if not user_rows or not user_rows[0][3]:
+        await bot.send_message(uid, "❌ <b>Xato:</b> Profilingizda eticket login/parol yo'q!\nWebApp → Profil bo'limiga kiring.", parse_mode="HTML")
+        return
+    
+    p_name, p_pass, p_birth, r_login, r_pass = user_rows[0]
+    if passenger_data:
+        p_name = passenger_data.get('name', p_name)
+        p_pass = passenger_data.get('passport', p_pass)
+        p_birth = passenger_data.get('birth', p_birth)
+
+    name_parts = (p_name or '').split()
+    familiya = name_parts[0] if len(name_parts) > 0 else ''
+    ism = name_parts[1] if len(name_parts) > 1 else ''
+    passport_series = (p_pass or '')[:2].upper()
+    passport_number = (p_pass or '')[2:]
+    birth_formatted = p_birth or ''
+    if birth_formatted and '-' in birth_formatted:
+        parts = birth_formatted.split('-')
+        if len(parts) == 3:
+            birth_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
+
+    await bot.send_message(uid, "🔄 <b>Avtomatik chipta olish boshlanmoqda...</b>", parse_mode="HTML")
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+        try:
+            # ── 1. LOGIN ─────────────────────────────────────────────────
+            await bot.send_message(uid, "1️⃣ Saytga kirilmoqda...")
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(3000)
+            
+            await page.evaluate("""
+                () => {
+                    for (const el of document.querySelectorAll('div, span, li')) {
+                        if (el.textContent.trim() === 'POCHTA') { el.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(1500)
+            
+            for sel in ["input[placeholder='Elektron pochta manzilini kiriting']", "input[placeholder*='pochta']", "input[type='email']"]:
+                el = await page.query_selector(sel)
+                if el and await el.is_visible():
+                    await el.fill(r_login); break
+            
+            for sel in ["input[placeholder='Parolni kiriting']", "input[type='password']"]:
+                el = await page.query_selector(sel)
+                if el and await el.is_visible():
+                    await el.fill(r_pass); break
+            
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        if (btn.textContent.includes('KIRISH') || btn.type === 'submit') { btn.click(); return; }
+                    }
+                }
+            """)
+            try:
+                await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
+            except:
+                await bot.send_message(uid, "❌ <b>Login xato!</b> Profilingizdagi login/parolni tekshiring.", parse_mode="HTML")
+                return
+
+            # ── 2. POYEZD QIDIRISH ───────────────────────────────────────
+            await bot.send_message(uid, "2️⃣ Poyezd qidirilmoqda...")
+            url = f"https://eticket.railway.uz/uz/pages/trains-page?date={date}&from={f_code}&to={t_code}"
+            await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            
+            clicked = await page.evaluate(f"""
+                () => {{
+                    const num = '{t_num}';
+                    const allEls = document.querySelectorAll('*');
+                    for (const el of allEls) {{
+                        if (el.children.length === 0 && el.textContent.trim() === num) {{
+                            const card = el.closest('li, tr, [class*="train"], [class*="item"], [class*="card"]');
+                            if (card) {{
+                                const btn = card.querySelector('button');
+                                if (btn) {{ btn.click(); return 'found:' + num; }}
+                            }}
+                        }}
+                    }}
+                    const firstBtn = document.querySelector('[class*="train-item"] button, [class*="train_item"] button');
+                    if (firstBtn) {{ firstBtn.click(); return 'first_train'; }}
+                    return false;
+                }}
+            """)
+            logging.info(f"Train selection: {clicked}")
+            await page.wait_for_timeout(3000)
+
+            # ── 3. VAGON TANLASH ─────────────────────────────────────────
+            await bot.send_message(uid, "3️⃣ Vagon va o'rindiq tanlanmoqda...")
+            await page.evaluate("""
+                () => {
+                    const sels = ['[class*="wagon"]:not(.disabled)', '[class*="car"]:not(.disabled)', '[class*="vagon"]:not(.disabled)'];
+                    for (const s of sels) {
+                        const el = document.querySelector(s);
+                        if (el) { el.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(2000)
+            
+            # O'rindiq tanlash
+            await page.evaluate("""
+                () => {
+                    const sels = ['[class*="seat"]:not([class*="occupied"]):not([class*="sold"])', '[class*="place"]:not([class*="busy"]):not([class*="occupied"])'];
+                    for (const s of sels) {
+                        const el = document.querySelector(s);
+                        if (el) { el.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(1000)
+            
+            # Davom etish
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        if (btn.textContent.includes('Davom') || btn.textContent.includes('Continue')) { btn.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(3000)
+
+            # ── 4. YO'LOVCHI MA'LUMOTLARI ─────────────────────────────────
+            await bot.send_message(uid, "4️⃣ Yo'lovchi ma'lumotlari to'ldirilmoqda...")
+            
+            async def fill_field(selectors, value):
+                for sel in selectors:
+                    el = await page.query_selector(sel)
+                    if el and await el.is_visible():
+                        await el.fill(value)
+                        return True
+                return False
+
+            await fill_field(["input[placeholder='Familiya']", "input[placeholder*='Familiya']"], familiya)
+            await fill_field(["input[placeholder='Ism']", "input[placeholder*='Ism']"], ism)
+            await fill_field(["input[placeholder='KK/OO/YYYY']", "input[placeholder*='sana']"], birth_formatted)
+            
+            # Jins tanlash
+            await page.evaluate("""
+                () => {
+                    const radios = document.querySelectorAll('input[type="radio"]');
+                    for (const r of radios) {
+                        const lbl = document.querySelector(`label[for="${r.id}"]`);
+                        if (lbl && lbl.textContent.includes('Erkak')) { r.click(); return; }
+                    }
+                    if (radios.length > 0) radios[0].click();
+                }
+            """)
+            
+            await fill_field(["input[placeholder*='__']", "input[placeholder*='seriya']", "input[placeholder*='hujjat']", "input[placeholder*='Pasport']"], f"{passport_series}{passport_number}")
+            await page.wait_for_timeout(500)
+
+            # Davom etish
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        if (btn.textContent.includes('Davom') || btn.textContent.includes('Continue')) { btn.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(3000)
+
+            # ── 5. TASDIQLASH ────────────────────────────────────────────
+            await bot.send_message(uid, "5️⃣ Buyurtma tasdiqlanmoqda...")
+            
+            # Oferta checkbox
+            await page.evaluate("""
+                () => {
+                    for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
+                        if (!cb.checked) cb.click();
+                    }
+                }
+            """)
+            await page.wait_for_timeout(500)
+            
+            await page.evaluate("""
+                () => {
+                    for (const btn of document.querySelectorAll('button')) {
+                        const t = btn.textContent.trim();
+                        if (t.includes('Tasdiqlash') || t.includes('Confirm') || t.includes('To\'lov')) { btn.click(); return; }
+                    }
+                }
+            """)
+            await page.wait_for_timeout(5000)
+
+            # ── 6. TO'LOV URL ────────────────────────────────────────────
+            final_url = page.url
+            logging.info(f"Final URL: {final_url}")
+            
+            await bot.send_message(
+                uid,
+                f"✅ <b>Chipta muvaffaqiyatli band qilindi!</b>\n\n"
+                f"💳 <b>To'lov uchun havolani oching:</b>\n{final_url}\n\n"
+                f"⚠️ <i>15 daqiqa ichida to'lov qilmasangiz, joy bekor qilinadi!</i>",
+                parse_mode="HTML"
+            )
+            await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub_id,))
+                
+        except Exception as e:
+            logging.error(f"Auto-booking error [{type(e).__name__}]: {e}")
+            await bot.send_message(uid, f"❌ <b>Xato:</b>\n<code>{type(e).__name__}: {str(e)[:150]}</code>", parse_mode="HTML")
+        finally:
+            await browser.close()
+
+async def handle_autobook_api(request):
+    """WebApp dan kelgan bron so'rovini qayta ishlash"""
+    try:
+        b = await request.json()
+        sub_id = b.get('sub_id')
+        passenger = b.get('passenger', {})
+        if not sub_id:
+            return web.json_response({"ok": False, "error": "sub_id kerak"})
+        asyncio.create_task(run_auto_booking(sub_id, passenger))
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
     """Orqa fonda Playwright orqali avtomatik olish mantiqi"""
     logging.info(f"Auto-booking started for sub: {sub_id}")
     
@@ -1110,18 +1347,7 @@ async def run_auto_booking(sub_id):
             # 7. To'lov havolasini olish
             final_url = page.url
             if "order" in final_url or "pay" in final_url:
-                msg = f"✅ <b>Chipta muvaffaqiyatli band qilindi!</b>\n\n🔗 <b>To'lov havolasi:</b>\n{final_url}\n\n⚠️ <i>Diqqat: 15 daqiqa ichida to'lov qilishingiz kerak!</i>"
-                await bot.send_message(uid, msg, parse_mode="HTML")
-                # Kuzatuvni o'chirish
-                await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub_id,))
-            else:
-                await bot.send_message(uid, "❌ <b>Avtomatik olishda xato:</b> To'lov sahifasiga o'tib bo'lmadi.")
-                
-        except Exception as e:
-            logging.error(f"Auto-booking error for {uid}: {e}")
-            await bot.send_message(uid, f"❌ <b>Avtomatik olishda xato:</b>\n{str(e)[:100]}...")
-        finally:
-            await browser.close()
+
 
 async def start_webserver():
     app = web.Application()
@@ -1138,6 +1364,7 @@ async def start_webserver():
     app.router.add_get("/api/profile", handle_profile_api)
     app.router.add_post("/api/profile", handle_profile_api)
     app.router.add_get("/api/logout", handle_logout_api)
+    app.router.add_post("/api/autobook", handle_autobook_api)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()

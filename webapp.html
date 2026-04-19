@@ -1630,8 +1630,8 @@
             </div>
             <div style="width: 100%; margin-top: 10px;">
                 <button class="btn-main" style="padding: 8px; font-size: 12px; background: var(--accent-green);" 
-                        onclick="openBooking('${s.train_num || ''}', '${s.from_st} - ${s.to_st}')" data-i18n="buy_btn">
-                    ${i18n('buy_btn')}
+                        onclick="openBooking(${s.id}, '${s.train_num || ''}', '${s.from_st}', '${s.to_st}', '${s.date}')">
+                    🎟️ ${i18n('autobook')}
                 </button>
             </div>
         </div>`).join('');
@@ -1738,20 +1738,29 @@
             } catch (e) { }
         }
 
-        let currentBookingTrain = null;
+        let currentSubId = null;
 
-        function openBooking(num, brand) {
-            currentBookingTrain = { num, brand };
+        async function openBooking(subId, trainNum, fromSt, toSt, date) {
+            currentSubId = subId;
+            const uid = tg.initDataUnsafe?.user?.id || 0;
+
+            // Profildan ma'lumotlarni olish
+            const pr = await fetch(`/api/profile?user_id=${uid}`);
+            const pd = await pr.json();
+
             const summary = document.getElementById('booking-summary');
-            const from = document.getElementById('from').options[document.getElementById('from').selectedIndex].text;
-            const to = document.getElementById('to').options[document.getElementById('to').selectedIndex].text;
-            const date = document.getElementById('date').value;
-
             summary.innerHTML = `
-                <div><span class="label">Yo'nalish:</span> <span class="value">${from} → ${to}</span></div>
-                <div><span class="label">Poyezd:</span> <span class="value">${brand} (№${num})</span></div>
+                <div><span class="label">Yo'nalish:</span> <span class="value">${fromSt} → ${toSt}</span></div>
+                <div><span class="label">Poyezd:</span> <span class="value">№${trainNum}</span></div>
                 <div><span class="label">Sana:</span> <span class="value">${date}</span></div>
             `;
+
+            if (pd.ok) {
+                document.getElementById('p-name').value = pd.p_name || '';
+                document.getElementById('p-passport').value = pd.p_passport || '';
+                document.getElementById('p-birth').value = pd.p_birth || '';
+            }
+
             document.getElementById('bookingModal').style.display = 'flex';
         }
 
@@ -1771,41 +1780,33 @@
                 return;
             }
 
-            const from = document.getElementById('from').options[document.getElementById('from').selectedIndex].text;
-            const to = document.getElementById('to').options[document.getElementById('to').selectedIndex].text;
-            const date = document.getElementById('date').value;
+            if (!currentSubId) {
+                tg.showAlert("Kuzatuv aniqlanmadi!");
+                return;
+            }
 
-            tg.showConfirm(i18n('book_confirm') + "?", async (ok) => {
-                if (ok) {
-                    tg.MainButton.showProgress();
-                    try {
-                        const r = await fetch('/api/book', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                user_id: tg.initDataUnsafe?.user?.id || 0,
-                                user_name: tg.initDataUnsafe?.user?.first_name || 'User',
-                                train_num: currentBookingTrain.num,
-                                train_brand: currentBookingTrain.brand,
-                                from_st: from,
-                                to_st: to,
-                                date: date,
-                                p_name: name,
-                                p_passport: passport,
-                                p_birth: birth
-                            })
-                        });
-                        const res = await r.json();
-                        if (res.ok) {
-                            tg.showAlert(i18n('book_success'));
-                            document.getElementById('bookingModal').style.display = 'none';
-                        } else {
-                            tg.showAlert("Xatolik: " + res.error);
-                        }
-                    } catch (e) {
-                        tg.showAlert("Server bilan ulanishda xato!");
-                    } finally {
-                        tg.MainButton.hideProgress();
+            tg.showConfirm("Orqa fonda avtomatik chipta rasmiylashtirish boshlansinmi?", async (ok) => {
+                if (!ok) return;
+                tg.MainButton.showProgress();
+                try {
+                    const r = await fetch('/api/autobook', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            sub_id: currentSubId,
+                            passenger: { name, passport, birth }
+                        })
+                    });
+                    const res = await r.json();
+                    if (res.ok) {
+                        document.getElementById('bookingModal').style.display = 'none';
+                        tg.showAlert("✅ Jarayon boshlandi! Telegram bot orqali xabar olasiz.");
+                    } else {
+                        tg.showAlert("Xatolik: " + (res.error || 'Noma\'lum xato'));
                     }
+                } catch (e) {
+                    tg.showAlert("Server bilan ulanishda xato!");
+                } finally {
+                    tg.MainButton.hideProgress();
                 }
             });
         }
