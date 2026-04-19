@@ -14,6 +14,7 @@ from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, WebAppInfo
 import json
+import re
 
 # ---- Configuration ----
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip() or None
@@ -849,7 +850,7 @@ async def handle_book_api(request):
         return web.json_response({"ok": False, "error": str(e)})
 
 async def verify_railway_login(login, password):
-    """Railway saytiga login/parol to'g'riligini tekshirish - faqat Email (POCHTA) orqali"""
+    """Railway saytiga email orqali login/parol tekshirish"""
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
@@ -857,60 +858,143 @@ async def verify_railway_login(login, password):
         )
         page = await context.new_page()
         try:
-            logging.info(f"Email login check for: {login}")
-            
-            # CSS ni BLOKLAMAYMIZ - Angular sayt uchun kerak!
-            # Faqat rasmlarni bloklaymiz
-            await page.route("**/*.{png,jpg,jpeg,gif,woff,woff2,ttf,eot}", lambda route: route.abort())
+            logging.info(f"Email login check started for: {login}")
 
-            # 1. Login sahifasiga kirish
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="networkidle")
-            logging.info("Login page loaded")
-            
-            # 2. POCHTA bo'limiga o'tish
-            # Login type tablaridan 2-sini (POCHTA) bosamiz
-            pochta_tab = page.locator("div.login-type-item", has_text="POCHTA")
-            await pochta_tab.first.click(timeout=10000)
-            logging.info("Clicked POCHTA tab")
-            
-            # 3. Email inputi paydo bo'lishini kutish
-            email_input = await page.wait_for_selector(
+            # 1. Sahifani ochish
+            await page.goto(
+                "https://eticket.railway.uz/uz/auth/login",
+                timeout=60000,
+                wait_until="domcontentloaded"
+            )
+            # Angular render uchun kutamiz
+            await page.wait_for_timeout(3000)
+            logging.info("Page loaded, waiting for Angular render")
+
+            # 2. POCHTA tabini JavaScript orqali bosish (eng ishonchli usul)
+            clicked = await page.evaluate("""
+                () => {
+                    const allDivs = document.querySelectorAll('div');
+                    for (const div of allDivs) {
+                        if (div.textContent.trim() === 'POCHTA' && div.children.length === 0) {
+                            div.click();
+                            return true;
+                        }
+                    }
+                    // Agar topilmasa, barcha span/label ni ham tekshiramiz
+                    const allEls = document.querySelectorAll('span, label, li, a');
+                    for (const el of allEls) {
+                        if (el.textContent.trim() === 'POCHTA') {
+                            el.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            """)
+            logging.info(f"POCHTA tab click result: {clicked}")
+            await page.wait_for_timeout(1500)
+
+            # 3. Email inputini topish (bir nechta usul bilan)
+            email_input = None
+            for selector in [
                 "input[placeholder='Elektron pochta manzilini kiriting']",
-                timeout=10000
-            )
-            await email_input.fill(login)
-            logging.info(f"Filled email: {login}")
-            
-            # 4. Parol kiritish
-            pass_input = await page.wait_for_selector(
+                "input[placeholder*='pochta']",
+                "input[placeholder*='email']",
+                "input[placeholder*='Email']",
+                "input[type='email']",
+            ]:
+                try:
+                    el = await page.query_selector(selector)
+                    if el and await el.is_visible():
+                        email_input = el
+                        logging.info(f"Found email input with: {selector}")
+                        break
+                except:
+                    continue
+
+            if not email_input:
+                return False, "Email kiritish maydoni topilmadi. Sayt o'zgargan bo'lishi mumkin."
+
+            await email_input.triple_click()
+            await email_input.type(login, delay=50)
+            logging.info("Email filled")
+
+            # 4. Parol inputini topish
+            pass_input = None
+            for selector in [
                 "input[placeholder='Parolni kiriting']",
-                timeout=5000
-            )
-            await pass_input.fill(password)
-            logging.info("Filled password")
-            
-            # 5. Kirish tugmasini kutish va bosish
-            await page.wait_for_selector("button.btn.btn-primary:not([disabled])", timeout=5000)
-            await page.click("button.btn.btn-primary")
-            logging.info("Clicked login button")
-            
+                "input[placeholder*='Parol']",
+                "input[type='password']",
+            ]:
+                try:
+                    el = await page.query_selector(selector)
+                    if el and await el.is_visible():
+                        pass_input = el
+                        logging.info(f"Found password input with: {selector}")
+                        break
+                except:
+                    continue
+
+            if not pass_input:
+                return False, "Parol kiritish maydoni topilmadi."
+
+            await pass_input.triple_click()
+            await pass_input.type(password, delay=50)
+            logging.info("Password filled")
+
+            # 5. Kirish tugmasini bosish
+            await page.wait_for_timeout(500)
+            btn_clicked = await page.evaluate("""
+                () => {
+                    const btns = document.querySelectorAll('button');
+                    for (const btn of btns) {
+                        if (btn.textContent.trim().includes('KIRISH') || 
+                            btn.textContent.trim().includes('Kirish') ||
+                            btn.type === 'submit') {
+                            btn.click();
+                            return btn.textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            logging.info(f"Login button clicked: {btn_clicked}")
+
             # 6. Natijani tekshirish
             try:
-                await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
-                logging.info("Login SUCCESS")
+                await page.wait_for_url(
+                    lambda url: "login" not in url,
+                    timeout=20000
+                )
+                logging.info(f"Login SUCCESS. Redirect to: {page.url}")
                 return True, None
             except:
                 # Xatolik xabarini qidirish
-                error_el = await page.query_selector(".alert-danger, .invalid-feedback, .text-danger, .error")
-                if error_el:
-                    err_text = (await error_el.inner_text()).strip()
-                    logging.error(f"Login failed with error: {err_text}")
+                err_text = await page.evaluate("""
+                    () => {
+                        const selectors = [
+                            '.alert-danger', '.invalid-feedback', 
+                            '.text-danger', '.error-message',
+                            '[class*="error"]', '[class*="alert"]'
+                        ];
+                        for (const sel of selectors) {
+                            const el = document.querySelector(sel);
+                            if (el && el.textContent.trim()) {
+                                return el.textContent.trim();
+                            }
+                        }
+                        return null;
+                    }
+                """)
+                current_url = page.url
+                logging.error(f"Login failed. URL: {current_url}, Error: {err_text}")
+                if err_text:
                     return False, err_text
                 return False, "Login yoki parol noto'g'ri."
-            
+
         except Exception as e:
-            logging.error(f"Login exception: {type(e).__name__}: {e}")
-            return False, f"Xato: {type(e).__name__} - {str(e)[:80]}"
+            logging.error(f"Login exception [{type(e).__name__}]: {e}")
+            return False, f"Xato [{type(e).__name__}]: {str(e)[:100]}"
         finally:
             await browser.close()
 
