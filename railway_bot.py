@@ -860,14 +860,16 @@ async def verify_railway_login(login, password):
         try:
             # 1. Login sahifasiga kirish
             logging.info(f"Verifying login for {login}...")
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="domcontentloaded")
-            await page.wait_for_selector("input[type='password']", timeout=20000)
+            # Resurslarni tejash uchun rasm va stillarni yuklamaymiz
+            await page.route("**/*.{png,jpg,jpeg,svg,css,woff,woff2}", lambda route: route.abort())
+            
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=45000, wait_until="domcontentloaded")
+            await page.wait_for_selector("input[type='password']", timeout=15000)
             
             # 2. Login turini aniqlash va kiritish
             if "@" in login:
                 try:
-                    await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
-                    await page.wait_for_selector("input[placeholder*='Elektron']", timeout=5000)
+                    await page.click("div.login-type-item:has-text('POCHTA')", timeout=3000)
                 except: pass
                 await page.fill("input[placeholder*='Elektron']", login)
             else:
@@ -879,23 +881,24 @@ async def verify_railway_login(login, password):
             # 4. Kirish tugmasini bosish
             await page.click("button.btn-primary:has-text('KIRISH')")
             
-            # 5. Natijani tekshirish (Timeoutni 30s qildim)
+            # 5. Natijani tekshirish
             try:
-                await page.wait_for_url(lambda url: "login" not in url, timeout=30000)
-                return True, None
+                await page.wait_for_url(lambda url: "login" not in url, timeout=20000)
+                return True, None, False
             except:
-                # Agar hali ham login sahifasida bo'lsa, xatolikni tekshirish
                 error_el = await page.query_selector(".alert-danger, .error-message, .mat-error, .invalid-feedback")
                 if error_el:
                     err_text = await error_el.inner_text()
-                    return False, err_text.strip()
-                return False, "Login yoki parol noto'g'ri (Sayt javob bermadi)."
+                    return False, err_text.strip(), False
+                return False, "Login yoki parol noto'g'ri.", False
             
         except Exception as e:
             logging.error(f"Login verify error for {login}: {e}")
             if "Timeout" in str(e):
-                return False, "Sayt juda sekin javob beryapti. Qayta urinib ko'ring."
-            return False, f"Ulanishda xato: {str(e)[:50]}"
+                return False, "Sayt juda sekin javob beryapti.", True
+            return False, f"Ulanishda xato: {str(e)[:50]}", False
+        finally:
+            await browser.close()
         finally:
             await browser.close()
 
@@ -910,12 +913,13 @@ async def handle_profile_api(request):
         b = await request.json()
         login = b.get('login', '').strip()
         password = b.get('password', '').strip()
+        force = b.get('force', False)
         
-        # Agar login/parol kiritilgan bo'lsa, tekshirib ko'ramiz
-        if login and password:
-            ok, err = await verify_railway_login(login, password)
+        # Agar login/parol kiritilgan bo'lsa va 'force' (majburiy) bo'lmasa, tekshirib ko'ramiz
+        if login and password and not force:
+            ok, err, is_timeout = await verify_railway_login(login, password)
             if not ok:
-                return web.json_response({"ok": False, "error": err})
+                return web.json_response({"ok": False, "error": err, "timeout": is_timeout})
         
         await db("UPDATE users SET p_name=?, p_passport=?, p_birth=?, r_login=?, r_password=? WHERE user_id=?", 
                  (b.get('name'), b.get('passport'), b.get('birth'), login, password, int(uid)))

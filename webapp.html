@@ -1157,7 +1157,7 @@
                 nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
                 save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
                 eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol",
-                checking: "Tekshirilmoqda..."
+                checking: "Tekshirilmoqda...", timeout_ask: "Sayt hozirda band. Ma'lumotlarni tekshirmasdan saqlashni xohlaysizmi?"
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1375,7 +1375,7 @@
             }
         }
 
-        async function saveProfile() {
+        async function saveProfile(force = false) {
             const uid = tg.initDataUnsafe?.user?.id || 0;
             const name = document.getElementById('prof-name').value.trim();
             const passport = document.getElementById('prof-passport').value.trim();
@@ -1390,13 +1390,19 @@
             try {
                 const r = await fetch(`/api/profile?user_id=${uid}`, {
                     method: 'POST',
-                    body: JSON.stringify({ name, passport, birth, login, password })
+                    body: JSON.stringify({ name, passport, birth, login, password, force })
                 });
                 const res = await r.json();
                 if (res.ok) {
                     tg.showAlert(i18n('profile_saved'));
                 } else {
-                    tg.showAlert(res.error || "Xatolik yuz berdi");
+                    if (res.timeout) {
+                        tg.showConfirm(i18n('timeout_ask'), (ok) => {
+                            if (ok) saveProfile(true);
+                        });
+                    } else {
+                        tg.showAlert(res.error || "Xatolik yuz berdi");
+                    }
                 }
             } catch (e) {
                 tg.showAlert("Server bilan ulanishda xato!");
@@ -1476,7 +1482,7 @@
             </div>
             
             <div class="train-actions">
-                <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
+                <button class="btn-track" style="width: 100%;" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
             </div>
         </div>`;
             }).join('');
