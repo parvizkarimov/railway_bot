@@ -848,6 +848,34 @@ async def handle_book_api(request):
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)})
 
+async def verify_railway_login(login, password):
+    """Railway saytiga login/parol to'g'riligini tekshirish"""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        try:
+            await page.goto("https://eticket.railway.uz/uz/pages/login", timeout=30000)
+            await page.fill("input[name='login']", login)
+            await page.fill("input[name='password']", password)
+            await page.click("button[type='submit']")
+            await page.wait_for_load_state("networkidle")
+            
+            # Agar login xato bo'lsa, xatolik xabari chiqadi yoki login sahifasida qoladi
+            # Muvaffaqiyatli bo'lsa, /profile yoki asosiy sahifaga o'tadi
+            if "login" in page.url:
+                # Saytdagi xatolik xabarini qidirish
+                error = await page.query_selector(".alert-danger")
+                if error:
+                    err_text = await error.inner_text()
+                    return False, err_text.strip()
+                return False, "Login yoki parol xato."
+            return True, None
+        except Exception as e:
+            return False, f"Ulanishda xato: {e}"
+        finally:
+            await browser.close()
+
 async def handle_profile_api(request):
     uid = request.query.get("user_id")
     if request.method == "GET":
@@ -857,8 +885,17 @@ async def handle_profile_api(request):
         return web.json_response({"ok": False})
     else:
         b = await request.json()
+        login = b.get('login', '').strip()
+        password = b.get('password', '').strip()
+        
+        # Agar login/parol kiritilgan bo'lsa, tekshirib ko'ramiz
+        if login and password:
+            ok, err = await verify_railway_login(login, password)
+            if not ok:
+                return web.json_response({"ok": False, "error": err})
+        
         await db("UPDATE users SET p_name=?, p_passport=?, p_birth=?, r_login=?, r_password=? WHERE user_id=?", 
-                 (b.get('name'), b.get('passport'), b.get('birth'), b.get('login'), b.get('password'), int(uid)))
+                 (b.get('name'), b.get('passport'), b.get('birth'), login, password, int(uid)))
         return web.json_response({"ok": True})
 
 async def run_auto_booking(sub_id):

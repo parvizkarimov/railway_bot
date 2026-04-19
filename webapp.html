@@ -1156,7 +1156,8 @@
                 passenger_birth: "Tug'ilgan sana", book_confirm: "Rasmiylashtirish", book_success: "Buyurtma qabul qilindi! Operator tez orada bog'lanadi.",
                 nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
                 save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
-                eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol"
+                eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol",
+                checking: "Tekshirilmoqda..."
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1382,12 +1383,27 @@
             const login = document.getElementById('prof-login').value.trim();
             const password = document.getElementById('prof-pass').value.trim();
 
-            const r = await fetch(`/api/profile?user_id=${uid}`, {
-                method: 'POST',
-                body: JSON.stringify({ name, passport, birth, login, password })
-            });
-            const res = await r.json();
-            if (res.ok) tg.showAlert(i18n('profile_saved'));
+            tg.MainButton.setText(i18n('checking'));
+            tg.MainButton.showProgress();
+            tg.MainButton.show();
+
+            try {
+                const r = await fetch(`/api/profile?user_id=${uid}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name, passport, birth, login, password })
+                });
+                const res = await r.json();
+                if (res.ok) {
+                    tg.showAlert(i18n('profile_saved'));
+                } else {
+                    tg.showAlert(res.error || "Xatolik yuz berdi");
+                }
+            } catch (e) {
+                tg.showAlert("Server bilan ulanishda xato!");
+            } finally {
+                tg.MainButton.hideProgress();
+                tg.MainButton.hide();
+            }
         }
 
         function swap() {
