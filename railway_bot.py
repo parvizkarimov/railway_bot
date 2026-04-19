@@ -296,6 +296,35 @@ async def init_db():
         # Eski bazalarni yangilash (agar train_num bo'lmasa)
         try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN train_num TEXT");
         except: pass
+        await conn.execute("""CREATE TABLE IF NOT EXISTS bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            train_num TEXT,
+            train_brand TEXT,
+            from_st TEXT,
+            to_st TEXT,
+            date TEXT,
+            passenger_name TEXT,
+            passenger_passport TEXT,
+            passenger_birth TEXT,
+            status TEXT DEFAULT 'pending',
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+        # Profil ustunlari
+        try: await conn.execute("ALTER TABLE users ADD COLUMN p_name TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE users ADD COLUMN p_passport TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE users ADD COLUMN p_birth TEXT")
+        except: pass
+        # Auto-book ustuni
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN auto_book INTEGER DEFAULT 0")
+        except: pass
+        # Login/Parol ustunlari
+        try: await conn.execute("ALTER TABLE users ADD COLUMN r_login TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE users ADD COLUMN r_password TEXT")
+        except: pass
         await conn.commit()
 
 async def db(query, params=(), fetch=False):
@@ -585,7 +614,15 @@ async def process_subscription(sub, now):
     if found_text:
         logging.info(f"Sub {sid}: Joy topildi! Xabar yuborilmoqda...")
         msg = f"🔔 <b>Bo'sh joy topildi!</b>\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
-        try: await bot.send_message(uid, msg, parse_mode="HTML")
+        try: 
+            await bot.send_message(uid, msg, parse_mode="HTML")
+            # Avtomatik olish yoqilgan bo'lsa
+            if sub[10]: # sub[10] = auto_book (id, uid, f_st, t_st, f_code, t_code, s_date, s_interval, s_prefs, s_max_p, s_train_num, ..., auto_book)
+                # sub indexlarini tekshirish: SELECT id(0), user_id(1), from_st(2), to_st(3), from_code(4), to_code(5), date(6), check_interval(7), preferred_seats(8), max_price(9), train_num(10), ..., auto_book(13)
+                # Checker dagi subs query: SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num, auto_book FROM ...
+                if sub[11]: # auto_book (11-index)
+                    await bot.send_message(uid, "⚡️ <b>Avtomatik olish boshlandi...</b>\nIltimos, kuting.", parse_mode="HTML")
+                    asyncio.create_task(run_auto_booking(sid))
         except Exception as e: logging.error(f"Xabar yuborishda xato: {e}")
     else:
         logging.info(f"Sub {sid}: Bo'sh joy topilmadi")
@@ -602,7 +639,7 @@ async def checker():
     while True:
         try:
             now = int(time.time())
-            subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
+            subs = await db("SELECT id, user_id, from_st, to_st, from_code, to_code, date, check_interval, preferred_seats, max_price, train_num, auto_book FROM subscriptions WHERE is_active=1 AND (last_checked + check_interval) <= ?", (now,), fetch=True)
             
             if subs:
                 tasks = []
@@ -650,7 +687,7 @@ async def handle_get_subs(request):
             is_premium = datetime.fromisoformat(premium_until) > datetime.now()
         except: pass
 
-    subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
+    subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price,auto_book FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
     res = []
     for s in (subs or []):
         prefs = json.loads(s[7])
@@ -658,7 +695,8 @@ async def handle_get_subs(request):
         uz_prefs = [format_pt_name(p) for p in prefs]
         res.append({
             "id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],
-            "date":s[5],"interval":s[6],"prefs":uz_prefs,"max_price":s[8]
+            "date":s[5],"interval":s[6],"prefs":uz_prefs,"max_price":s[8],
+            "auto_book": bool(s[9])
         })
     return web.json_response({"subs": res, "is_premium": is_premium, "premium_until": premium_until[:10] if premium_until else None})
 
@@ -692,9 +730,9 @@ async def handle_add_sub(request):
             return web.json_response({"ok": False, "error": "Qayerdan va Qayerga bir xil bo'lishi mumkin emas."})
         
         await db("""INSERT INTO subscriptions 
-            (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats) 
-            VALUES (?,?,?,?,?,?,?,?,?)""", (
-            uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', []))
+            (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats, auto_book) 
+            VALUES (?,?,?,?,?,?,?,?,?,?)""", (
+            uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', [])) , 1 if b.get('auto_book') else 0
         ))
         
         # Yangi ID ni olish va darhol tekshiruvni boshlash
@@ -787,6 +825,129 @@ async def handle_get_chat_api(request):
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)})
 
+async def handle_book_api(request):
+    try:
+        b = await request.json()
+        uid = b.get("user_id")
+        await db("""INSERT INTO bookings 
+            (user_id, train_num, train_brand, from_st, to_st, date, passenger_name, passenger_passport, passenger_birth) 
+            VALUES (?,?,?,?,?,?,?,?,?)""", (
+            uid, b.get('train_num'), b.get('train_brand'), b.get('from_st'), b.get('to_st'), 
+            b.get('date'), b.get('p_name'), b.get('p_passport'), b.get('p_birth')
+        ))
+        admin_msg = f"🛒 <b>Yangi Chipta Buyurtmasi!</b>\n\n" \
+                    f"👤 <b>User:</b> {b.get('user_name')} (ID: {uid})\n" \
+                    f"🚂 <b>Poyezd:</b> {b.get('train_brand')} (№{b.get('train_num')})\n" \
+                    f"📍 <b>Yo'nalish:</b> {b.get('from_st')} → {b.get('to_st')}\n" \
+                    f"📅 <b>Sana:</b> {b.get('date')}\n\n" \
+                    f"👤 <b>Yo'lovchi:</b> {b.get('p_name')}\n" \
+                    f"🆔 <b>Pasport:</b> {b.get('p_passport')}\n" \
+                    f"🎂 <b>Tug'ilgan sana:</b> {b.get('p_birth')}"
+        await bot.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)})
+
+async def handle_profile_api(request):
+    uid = request.query.get("user_id")
+    if request.method == "GET":
+        user = await db("SELECT p_name, p_passport, p_birth, r_login, r_password FROM users WHERE user_id=?", (int(uid),), fetch=True)
+        if user:
+            return web.json_response({"ok": True, "p_name": user[0][0], "p_passport": user[0][1], "p_birth": user[0][2], "r_login": user[0][3], "r_password": user[0][4]})
+        return web.json_response({"ok": False})
+    else:
+        b = await request.json()
+        await db("UPDATE users SET p_name=?, p_passport=?, p_birth=?, r_login=?, r_password=? WHERE user_id=?", 
+                 (b.get('name'), b.get('passport'), b.get('birth'), b.get('login'), b.get('password'), int(uid)))
+        return web.json_response({"ok": True})
+
+async def run_auto_booking(sub_id):
+    """Orqa fonda Playwright orqali avtomatik olish mantiqi"""
+    logging.info(f"Auto-booking started for sub: {sub_id}")
+    
+    # 1. Ma'lumotlarni bazadan olish
+    sub_rows = await db("SELECT user_id, from_code, to_code, date, train_num, preferred_seats FROM subscriptions WHERE id=?", (sub_id,), fetch=True)
+    if not sub_rows: return
+    uid, f_code, t_code, date, t_num, prefs_json = sub_rows[0]
+    
+    user_rows = await db("SELECT p_name, p_passport, p_birth, r_login, r_password FROM users WHERE user_id=?", (uid,), fetch=True)
+    if not user_rows or not user_rows[0][0]:
+        await bot.send_message(uid, "❌ <b>Xato:</b> Profilingiz to'ldirilmagan! WebApp -> Profil bo'limiga kiring.")
+        return
+    p_name, p_pass, p_birth, r_login, r_pass = user_rows[0]
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        
+        try:
+            # 2. Avtorizatsiya (Login)
+            await page.goto("https://eticket.railway.uz/uz/pages/login", timeout=60000)
+            if r_login and r_pass:
+                await page.fill("input[name='login']", r_login)
+                await page.fill("input[name='password']", r_pass)
+                await page.click("button[type='submit']")
+                await page.wait_for_load_state("networkidle")
+            
+            # 3. Qidiruv sahifasiga o'tish
+            url = f"https://eticket.railway.uz/uz/pages/trains-page?date={date}&from={f_code}&to={t_code}"
+            await page.goto(url, timeout=60000)
+            await page.wait_for_load_state("networkidle")
+            
+            # 3. Poyezdni topish va tanlash
+            # Reys raqami bo'yicha qidirish
+            train_selector = f"text='{t_num}'"
+            await page.wait_for_selector(train_selector, timeout=10000)
+            
+            # "Tanlash" tugmasini topish (poyezd blokining ichidan)
+            train_card = page.locator(".train-item").filter(has_text=t_num)
+            await train_card.get_by_role("button", name="Tanlash").click()
+            await asyncio.sleep(2)
+            
+            # 4. Vagon va o'rin tanlash
+            # Birinchi bo'sh vagonni tanlash
+            await page.locator(".wagon-item").first.click()
+            await asyncio.sleep(1)
+            
+            # Birinchi bo'sh o'rinni tanlash
+            await page.locator(".seat-available").first.click()
+            await page.get_by_role("button", name="Davom etish").click()
+            
+            # 5. Yo'lovchi ma'lumotlarini to'ldirish
+            # Ism va familiyani ajratish (agar bo'sh joy bo'lsa)
+            name_parts = p_name.split()
+            surname = name_parts[0] if len(name_parts) > 0 else p_name
+            firstname = name_parts[1] if len(name_parts) > 1 else ""
+            
+            await page.fill("input[placeholder*='Familiya']", surname)
+            await page.fill("input[placeholder*='Ism']", firstname)
+            await page.fill("input[placeholder*='Seriya']", p_pass[:2])
+            await page.fill("input[placeholder*='Raqam']", p_pass[2:])
+            
+            # Tug'ilgan sana (input type="date" bo'lishi mumkin)
+            await page.fill("input[type='date']", p_birth)
+            
+            # 6. Bron qilishni yakunlash
+            await page.get_by_role("button", name="Bron qilish").click()
+            await page.wait_for_load_state("networkidle")
+            
+            # 7. To'lov havolasini olish
+            final_url = page.url
+            if "order" in final_url or "pay" in final_url:
+                msg = f"✅ <b>Chipta muvaffaqiyatli band qilindi!</b>\n\n🔗 <b>To'lov havolasi:</b>\n{final_url}\n\n⚠️ <i>Diqqat: 15 daqiqa ichida to'lov qilishingiz kerak!</i>"
+                await bot.send_message(uid, msg, parse_mode="HTML")
+                # Kuzatuvni o'chirish
+                await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sub_id,))
+            else:
+                await bot.send_message(uid, "❌ <b>Avtomatik olishda xato:</b> To'lov sahifasiga o'tib bo'lmadi.")
+                
+        except Exception as e:
+            logging.error(f"Auto-booking error for {uid}: {e}")
+            await bot.send_message(uid, f"❌ <b>Avtomatik olishda xato:</b>\n{str(e)[:100]}...")
+        finally:
+            await browser.close()
+
 async def start_webserver():
     app = web.Application()
     app.router.add_get("/", handle_webapp)
@@ -798,6 +959,9 @@ async def start_webserver():
     app.router.add_post("/api/create_invoice", handle_create_invoice)
     app.router.add_post("/api/support", handle_support_api)
     app.router.add_get("/api/support/messages", handle_get_chat_api)
+    app.router.add_post("/api/book", handle_book_api)
+    app.router.add_get("/api/profile", handle_profile_api)
+    app.router.add_post("/api/profile", handle_profile_api)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()

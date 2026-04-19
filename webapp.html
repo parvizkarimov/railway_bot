@@ -803,6 +803,56 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* Booking Modal Styles */
+        .booking-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .booking-summary {
+            background: rgba(46, 166, 255, 0.1);
+            padding: 15px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .booking-summary div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .booking-summary .label {
+            opacity: 0.6;
+            font-weight: 500;
+        }
+
+        .booking-summary .value {
+            font-weight: 700;
+        }
+
+        .train-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-book {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-green);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(52, 199, 89, 0.2);
+        }
     </style>
 </head>
 
@@ -917,6 +967,61 @@
                     <button class="btn-main" onclick="openPremiumModal()" data-i18n="buy_btn">Sotib olish</button>
                 </div>
             </div>
+
+            <!-- Profile Section -->
+            <div id="profile-section" class="section">
+                <div class="glass-card">
+                    <h2 style="margin-bottom: 20px;" data-i18n="profile_title">Mening ma'lumotlarim</h2>
+                    <p style="opacity: 0.6; font-size: 13px; margin-bottom: 20px;" data-i18n="profile_desc">
+                        Avtomatik olish (Auto-book) uchun pasport ma'lumotlaringizni to'g'ri kiriting.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="passenger_name">F.I.SH (Pasport bo'yicha)</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">👤</span>
+                            <input type="text" id="prof-name" class="form-input" placeholder="ABDULLAYEV ABDULLA">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="passenger_passport">Pasport seriya va raqami</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🆔</span>
+                            <input type="text" id="prof-passport" class="form-input" placeholder="AA1234567">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="passenger_birth">Tug'ilgan sana</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🎂</span>
+                            <input type="date" id="prof-birth" class="form-input">
+                        </div>
+                    </div>
+
+                    <div style="height: 1px; background: rgba(0,0,0,0.05); margin: 20px 0;"></div>
+                    <h3 style="font-size: 14px; margin-bottom: 15px;" data-i18n="eticket_auth">Eticket.railway.uz kirish</h3>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="eticket_login">Login (Telefon yoki Email)</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">📧</span>
+                            <input type="text" id="prof-login" class="form-input" placeholder="example@mail.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="eticket_pass">Parol</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔑</span>
+                            <input type="password" id="prof-pass" class="form-input" placeholder="******">
+                        </div>
+                    </div>
+
+                    <button class="btn-main" onclick="saveProfile()" data-i18n="save_btn">Saqlash</button>
+                </div>
+            </div>
         </div> <!-- app-container end -->
     </div> <!-- app end -->
 
@@ -960,6 +1065,10 @@
             <span class="nav-icon">⭐</span>
             <span class="nav-label" data-i18n="nav_stars">Stars</span>
         </div>
+        <div class="nav-item" onclick="navTo('profile-section', this)">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label" data-i18n="nav_profile">Profil</span>
+        </div>
         <div class="nav-item" onclick="navTo('support-section', this)">
             <span class="nav-icon">🎧</span>
             <span class="nav-label" data-i18n="nav_support">Yordam</span>
@@ -984,6 +1093,47 @@
         </div>
     </div>
 
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal" onclick="closeBookingModal(event)">
+        <div class="modal-c" onclick="event.stopPropagation()">
+            <div class="modal-title" data-i18n="book_title">Chipta rasmiylashtirish</div>
+            
+            <div id="booking-summary" class="booking-summary">
+                <!-- Will be filled by JS -->
+            </div>
+
+            <div class="booking-form">
+                <div class="form-group">
+                    <label class="form-label" data-i18n="passenger_name">F.I.SH (Pasport bo'yicha)</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="p-name" class="form-input" placeholder="ABDULLAYEV ABDULLA">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="passenger_passport">Pasport seriya va raqami</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🆔</span>
+                        <input type="text" id="p-passport" class="form-input" placeholder="AA1234567">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="passenger_birth">Tug'ilgan sana</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🎂</span>
+                        <input type="date" id="p-birth" class="form-input">
+                    </div>
+                </div>
+
+                <button class="btn-main" style="background: var(--accent-green);" onclick="confirmBooking()" data-i18n="book_confirm">Tasdiqlash</button>
+                <button class="btn-main" style="background: var(--tg-secondary); color: var(--tg-text); margin-top: 10px;"
+                    onclick="closeBookingModal(null)" data-i18n="close_btn">Yopish</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         let isPremium = false; // Global o'zgaruvchini e'lon qilamiz
@@ -1001,7 +1151,12 @@
                 added: "Qo'shildi!", interval: "Interval",
                 locked: "Premium obuna talab qilinadi.", status_oddiy: "Holat: Oddiy",
                 premium_title: "Premium Afzalliklari", premium_desc: "• Tezkor kuzatuv (15s, 30s)<br>• Cheksiz kuzatuvlar soni<br>• Birinchilardan bo'lib xabar olish",
-                buy_btn: "Sotib olish", modal_title: "Premium Tanlang", plan_1: "1 kunlik", plan_5: "5 kunlik", plan_10: "10 kunlik", close_btn: "Yopish"
+                buy_btn: "Sotib olish", modal_title: "Premium Tanlang", plan_1: "1 kunlik", plan_5: "5 kunlik", plan_10: "10 kunlik", close_btn: "Yopish",
+                book_title: "Chipta rasmiylashtirish", passenger_name: "F.I.SH (Pasport bo'yicha)", passenger_passport: "Pasport seriya va raqami",
+                passenger_birth: "Tug'ilgan sana", book_confirm: "Rasmiylashtirish", book_success: "Buyurtma qabul qilindi! Operator tez orada bog'lanadi.",
+                nav_profile: "Profil", profile_title: "Mening ma'lumotlarim", profile_desc: "Avtomatik olish (Auto-book) uchun ma'lumotlarni to'ldiring.",
+                save_btn: "Saqlash", autobook: "Avtomatik olish (Auto-book)", profile_saved: "Ma'lumotlar saqlandi!",
+                eticket_auth: "Eticket sayti uchun avtorizatsiya", eticket_login: "Login (Telefon yoki Email)", eticket_pass: "Parol"
             },
             uz_cyrl: {
                 app_title: "Railway Bot", app_subtitle: "Тезкор чипта кузатув тизими",
@@ -1015,7 +1170,9 @@
                 added: "Қўшилди!", interval: "Интервал",
                 locked: "Premium обуна талаб қилинади.", status_oddiy: "Ҳолат: Оддий",
                 premium_title: "Premium Афзалликлари", premium_desc: "• Тезкор кузатув (15s, 30s)<br>• Чексиз кузатувлар сони<br>• Биринчилардан бўлиб хабар олиш",
-                buy_btn: "Сотиб олиш", modal_title: "Premium Танланг", plan_1: "1 кунлик", plan_5: "5 кунлик", plan_10: "10 кунлик", close_btn: "Ёпиш"
+                buy_btn: "Сотиб олиш", modal_title: "Premium Танланг", plan_1: "1 кунлик", plan_5: "5 кунлик", plan_10: "10 кунлик", close_btn: "Ёпиш",
+                book_title: "Чипта расмийлаштириш", passenger_name: "Ф.И.Ш (Паспорт бўйича)", passenger_passport: "Паспорт серия ва рақами",
+                passenger_birth: "Туғилган сана", book_confirm: "Расмийлаштириш", book_success: "Буюртма қабул қилинди! Оператор тез орада боғланади."
             },
             ru: {
                 app_title: "Railway Bot", app_subtitle: "Система мониторинга билетов",
@@ -1029,7 +1186,9 @@
                 added: "Добавлено!", interval: "Интервал",
                 locked: "Требуется Premium подписка.", status_oddiy: "Статус: Обычный",
                 premium_title: "Преимущества Premium", premium_desc: "• Быстрое слежение (15с, 30с)<br>• Безлимит на слежения<br>• Оповещения в числе первых",
-                buy_btn: "Купить", modal_title: "Выберите Premium", plan_1: "1 день", plan_5: "5 дней", plan_10: "10 дней", close_btn: "Закрыть"
+                buy_btn: "Купить", modal_title: "Выберите Premium", plan_1: "1 день", plan_5: "5 дней", plan_10: "10 дней", close_btn: "Закрыть",
+                book_title: "Оформление билета", passenger_name: "Ф.И.О (По паспорту)", passenger_passport: "Серия и номер паспорта",
+                passenger_birth: "Дата рождения", book_confirm: "Оформить", book_success: "Заказ принят! Оператор свяжется с вами в ближайшее время."
             },
             en: {
                 app_title: "Railway Bot", app_subtitle: "Fast ticket monitoring system",
@@ -1043,7 +1202,9 @@
                 added: "Added!", interval: "Interval",
                 locked: "Premium subscription required.", status_oddiy: "Status: Regular",
                 premium_title: "Premium Benefits", premium_desc: "• Fast monitoring (15s, 30s)<br>• Unlimited monitors<br>• Instant notifications",
-                buy_btn: "Buy Now", modal_title: "Choose Premium", plan_1: "1 day", plan_5: "5 days", plan_10: "10 days", close_btn: "Close"
+                buy_btn: "Buy Now", modal_title: "Choose Premium", plan_1: "1 day", plan_5: "5 days", plan_10: "10 days", close_btn: "Close",
+                book_title: "Book Ticket", passenger_name: "Full Name (As in passport)", passenger_passport: "Passport Series & Number",
+                passenger_birth: "Date of Birth", book_confirm: "Confirm Booking", book_success: "Order received! Our agent will contact you shortly."
             },
             kaa: {
                 app_title: "Railway Bot", app_subtitle: "Tezkor bilet baqlaw sisteması",
@@ -1197,6 +1358,36 @@
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             el.classList.add('active');
             if (id === 'subs-section') loadSubs();
+            if (id === 'profile-section') loadProfile();
+        }
+
+        async function loadProfile() {
+            const uid = tg.initDataUnsafe?.user?.id || 0;
+            const r = await fetch(`/api/profile?user_id=${uid}`);
+            const d = await r.json();
+            if (d.ok) {
+                document.getElementById('prof-name').value = d.p_name || "";
+                document.getElementById('prof-passport').value = d.p_passport || "";
+                document.getElementById('prof-birth').value = d.p_birth || "";
+                document.getElementById('prof-login').value = d.r_login || "";
+                document.getElementById('prof-pass').value = d.r_password || "";
+            }
+        }
+
+        async function saveProfile() {
+            const uid = tg.initDataUnsafe?.user?.id || 0;
+            const name = document.getElementById('prof-name').value.trim();
+            const passport = document.getElementById('prof-passport').value.trim();
+            const birth = document.getElementById('prof-birth').value;
+            const login = document.getElementById('prof-login').value.trim();
+            const password = document.getElementById('prof-pass').value.trim();
+
+            const r = await fetch(`/api/profile?user_id=${uid}`, {
+                method: 'POST',
+                body: JSON.stringify({ name, passport, birth, login, password })
+            });
+            const res = await r.json();
+            if (res.ok) tg.showAlert(i18n('profile_saved'));
         }
 
         function swap() {
@@ -1268,7 +1459,17 @@
                 </div>
             </div>
             
-            <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
+            <div class="form-group" style="margin-top: 15px;">
+                <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                    <span data-i18n="autobook">${i18n('autobook')}</span>
+                    <input type="checkbox" id="auto-${t.number}" style="width: 20px; height: 20px;">
+                </label>
+            </div>
+            
+            <div class="train-actions">
+                <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
+                <button class="btn-book" onclick="openBooking('${t.number}', '${t.brand}')" data-i18n="buy_btn">${i18n('buy_btn')}</button>
+            </div>
         </div>`;
             }).join('');
         }
@@ -1293,7 +1494,8 @@
                     date: document.getElementById('date').value,
                     train_num: num,
                     interval: 60,
-                    prefs: ["lower", "upper", "sitting"]
+                    prefs: ["lower", "upper", "sitting"],
+                    auto_book: document.getElementById(`auto-${num}`).checked
                 })
             });
             const res = await r.json();
@@ -1488,6 +1690,78 @@
                 });
                 loadChatHistory();
             } catch (e) { }
+        }
+
+        let currentBookingTrain = null;
+
+        function openBooking(num, brand) {
+            currentBookingTrain = { num, brand };
+            const summary = document.getElementById('booking-summary');
+            const from = document.getElementById('from').options[document.getElementById('from').selectedIndex].text;
+            const to = document.getElementById('to').options[document.getElementById('to').selectedIndex].text;
+            const date = document.getElementById('date').value;
+
+            summary.innerHTML = `
+                <div><span class="label">Yo'nalish:</span> <span class="value">${from} → ${to}</span></div>
+                <div><span class="label">Poyezd:</span> <span class="value">${brand} (№${num})</span></div>
+                <div><span class="label">Sana:</span> <span class="value">${date}</span></div>
+            `;
+            document.getElementById('bookingModal').style.display = 'flex';
+        }
+
+        function closeBookingModal(e) {
+            if (!e || e.target.id === 'bookingModal') {
+                document.getElementById('bookingModal').style.display = 'none';
+            }
+        }
+
+        async function confirmBooking() {
+            const name = document.getElementById('p-name').value.trim();
+            const passport = document.getElementById('p-passport').value.trim();
+            const birth = document.getElementById('p-birth').value;
+
+            if (!name || !passport || !birth) {
+                tg.showAlert("Iltimos, barcha maydonlarni to'ldiring!");
+                return;
+            }
+
+            const from = document.getElementById('from').options[document.getElementById('from').selectedIndex].text;
+            const to = document.getElementById('to').options[document.getElementById('to').selectedIndex].text;
+            const date = document.getElementById('date').value;
+
+            tg.showConfirm(i18n('book_confirm') + "?", async (ok) => {
+                if (ok) {
+                    tg.MainButton.showProgress();
+                    try {
+                        const r = await fetch('/api/book', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                user_id: tg.initDataUnsafe?.user?.id || 0,
+                                user_name: tg.initDataUnsafe?.user?.first_name || 'User',
+                                train_num: currentBookingTrain.num,
+                                train_brand: currentBookingTrain.brand,
+                                from_st: from,
+                                to_st: to,
+                                date: date,
+                                p_name: name,
+                                p_passport: passport,
+                                p_birth: birth
+                            })
+                        });
+                        const res = await r.json();
+                        if (res.ok) {
+                            tg.showAlert(i18n('book_success'));
+                            document.getElementById('bookingModal').style.display = 'none';
+                        } else {
+                            tg.showAlert("Xatolik: " + res.error);
+                        }
+                    } catch (e) {
+                        tg.showAlert("Server bilan ulanishda xato!");
+                    } finally {
+                        tg.MainButton.hideProgress();
+                    }
+                }
+            });
         }
 
         init();
