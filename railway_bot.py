@@ -859,18 +859,18 @@ async def verify_railway_login(login, password):
         page = await context.new_page()
         try:
             # 1. Login sahifasiga kirish
-            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=40000)
-            await page.wait_for_load_state("networkidle")
+            logging.info(f"Verifying login for {login}...")
+            await page.goto("https://eticket.railway.uz/uz/auth/login", timeout=60000, wait_until="domcontentloaded")
+            await page.wait_for_selector("input[type='password']", timeout=20000)
             
             # 2. Login turini aniqlash va kiritish
             if "@" in login:
-                # Pochta orqali kirish
                 try:
                     await page.click("div.login-type-item:has-text('POCHTA')", timeout=5000)
+                    await page.wait_for_selector("input[placeholder*='Elektron']", timeout=5000)
                 except: pass
                 await page.fill("input[placeholder*='Elektron']", login)
             else:
-                # Telefon orqali kirish
                 await page.fill("input[placeholder*='+998']", login)
             
             # 3. Parolni kiritish
@@ -878,21 +878,24 @@ async def verify_railway_login(login, password):
             
             # 4. Kirish tugmasini bosish
             await page.click("button.btn-primary:has-text('KIRISH')")
-            await page.wait_for_load_state("networkidle")
             
-            # 5. Natijani tekshirish
-            current_url = page.url
-            if "login" in current_url:
-                error_el = await page.query_selector(".alert-danger, .error-message, .mat-error")
+            # 5. Natijani tekshirish (Timeoutni 30s qildim)
+            try:
+                await page.wait_for_url(lambda url: "login" not in url, timeout=30000)
+                return True, None
+            except:
+                # Agar hali ham login sahifasida bo'lsa, xatolikni tekshirish
+                error_el = await page.query_selector(".alert-danger, .error-message, .mat-error, .invalid-feedback")
                 if error_el:
                     err_text = await error_el.inner_text()
                     return False, err_text.strip()
-                return False, "Login yoki parol noto'g'ri."
+                return False, "Login yoki parol noto'g'ri (Sayt javob bermadi)."
             
-            return True, None
         except Exception as e:
-            logging.error(f"Login verify error: {e}")
-            return False, f"Sayt bilan bog'lanishda xato yuz berdi (Timeout)."
+            logging.error(f"Login verify error for {login}: {e}")
+            if "Timeout" in str(e):
+                return False, "Sayt juda sekin javob beryapti. Qayta urinib ko'ring."
+            return False, f"Ulanishda xato: {str(e)[:50]}"
         finally:
             await browser.close()
 
