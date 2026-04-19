@@ -1475,16 +1475,8 @@
                 </div>
             </div>
             
-            <div class="form-group" style="margin-top: 15px;">
-                <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-                    <span data-i18n="autobook">${i18n('autobook')}</span>
-                    <input type="checkbox" id="auto-${t.number}" style="width: 20px; height: 20px;">
-                </label>
-            </div>
-            
             <div class="train-actions">
                 <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
-                <button class="btn-book" onclick="openBooking('${t.number}', '${t.brand}')" data-i18n="buy_btn">${i18n('buy_btn')}</button>
             </div>
         </div>`;
             }).join('');
@@ -1511,7 +1503,7 @@
                     train_num: num,
                     interval: 60,
                     prefs: ["lower", "upper", "sitting"],
-                    auto_book: document.getElementById(`auto-${num}`).checked
+                    auto_book: false
                 })
             });
             const res = await r.json();
@@ -1595,15 +1587,23 @@
                 w.innerHTML = `<div class="loading">${i18n('empty_monitor')}</div>`;
             } else {
                 w.innerHTML = d.subs.map(s => `
-        <div class="sub-card">
-            <div class="sub-info">
-                <h3>${s.from_st} → ${s.to_st}</h3>
-                <div class="sub-meta">
-                    <span>${s.date}</span>
-                    <span class="sub-int" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+        <div class="sub-card" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <div class="sub-info">
+                    <h3>${s.from_st} → ${s.to_st}</h3>
+                    <div class="sub-meta">
+                        <span>${s.date}</span>
+                        <span class="sub-int" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
+                    </div>
                 </div>
+                <div class="sub-del" onclick="delSub(${s.id})">×</div>
             </div>
-            <div class="sub-del" onclick="delSub(${s.id})">×</div>
+            <div style="width: 100%; margin-top: 10px;">
+                <button class="btn-main" style="padding: 8px; font-size: 12px; background: var(--accent-green);" 
+                        onclick="openBooking('${s.train_num || ''}', '${s.from_st} - ${s.to_st}')" data-i18n="buy_btn">
+                    ${i18n('buy_btn')}
+                </button>
+            </div>
         </div>`).join('');
             }
         }
