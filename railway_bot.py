@@ -1309,7 +1309,7 @@ async def run_auto_booking(sub_id, passenger_data=None):
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(5000)
             
-            train_items = await page.query_selector_all('app-train-item, li.train-item, .train-card, [class*="train-item"]')
+            train_items = await page.query_selector_all('app-train-item, .train-card')
             clicked_train = False
             for item in train_items:
                 text = await item.inner_text()
@@ -1319,14 +1319,6 @@ async def run_auto_booking(sub_id, passenger_data=None):
                         await btn.click()
                         clicked_train = True
                         break
-            
-            if not clicked_train:
-                # Agar aniq raqam bilan topolmasa, birinchi kelgan poyezdni tanlaymiz (ehtiyot chorasi)
-                if train_items:
-                    btn = await train_items[0].query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
-                    if btn:
-                        await btn.click()
-                        clicked_train = True
             
             if not clicked_train:
                 await bot.send_message(uid, f"❌ <b>Xato:</b> {t_num} poyezdni tanlab bo'lmadi. (Selector topilmadi)")
