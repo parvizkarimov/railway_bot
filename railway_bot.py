@@ -1309,16 +1309,28 @@ async def run_auto_booking(sub_id, passenger_data=None):
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             await page.wait_for_timeout(5000)
             
-            train_items = await page.query_selector_all('app-train-item, .train-card')
+            train_items = await page.query_selector_all('app-train-item, li.train-item, .train-card, [class*="train-item"]')
             clicked_train = False
+            
+            import re
+            match = re.search(r'\d+', t_num)
+            t_num_digits = match.group() if match else t_num
+            t_num_clean = t_num.lstrip('0')
+            
             for item in train_items:
                 text = await item.inner_text()
-                if t_num in text or t_num.lstrip('0') in text:
-                    btn = await item.query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
-                    if btn:
-                        await btn.click()
-                        clicked_train = True
-                        break
+                
+                # Agar element o'ta qisqa matnga ega bo'lsa (masalan faqat raqamning o'zi bo'lgan child element), skip
+                # Lekin biz buni button bilan tekshiramiz.
+                btn = await item.query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
+                if not btn:
+                    continue # Tugmasi yo'q element poyezd kartochkasi emas
+                
+                # Matn tekshiruvi: aniq raqam, nolsiz raqam, yoki faqat sonlar
+                if t_num in text or (t_num_clean and t_num_clean in text) or (t_num_digits and t_num_digits in text):
+                    await btn.click()
+                    clicked_train = True
+                    break
             
             if not clicked_train:
                 await bot.send_message(uid, f"❌ <b>Xato:</b> {t_num} poyezdni tanlab bo'lmadi. (Selector topilmadi)")
