@@ -1307,7 +1307,12 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 search_date = f"{p[2]}.{p[1]}.{p[0]}"
             url = f"https://eticket.railway.uz/uz/pages/trains-page?date={search_date}&from={f_code}&to={t_code}"
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
-            await page.wait_for_timeout(5000)
+            
+            try:
+                await page.wait_for_selector('app-train-item, .train-card', timeout=15000)
+            except:
+                pass
+            await page.wait_for_timeout(2000)
             
             train_items = await page.query_selector_all('app-train-item, li.train-item, .train-card, [class*="train-item"]')
             clicked_train = False
@@ -1322,7 +1327,7 @@ async def run_auto_booking(sub_id, passenger_data=None):
                 
                 # Agar element o'ta qisqa matnga ega bo'lsa (masalan faqat raqamning o'zi bo'lgan child element), skip
                 # Lekin biz buni button bilan tekshiramiz.
-                btn = await item.query_selector('a.btn.btn-primary, button.btn-primary, button, a.btn')
+                btn = await item.query_selector('.btn-primary, button, a.btn, [class*="btn-primary"]')
                 if not btn:
                     continue # Tugmasi yo'q element poyezd kartochkasi emas
                 
