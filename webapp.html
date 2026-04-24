@@ -1528,7 +1528,19 @@
         }
 
         function togglePref(el) {
-            el.classList.toggle('active');
+            const container = el.parentElement;
+            const allChips = container.querySelectorAll('.chip');
+            const activeChips = container.querySelectorAll('.chip.active');
+            
+            if (activeChips.length === allChips.length) {
+                allChips.forEach(c => c.classList.remove('active'));
+                el.classList.add('active');
+            } else {
+                el.classList.toggle('active');
+                if (container.querySelectorAll('.chip.active').length === 0) {
+                    allChips.forEach(c => c.classList.add('active'));
+                }
+            }
         }
 
         async function addWatch(num) {
