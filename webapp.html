@@ -1149,7 +1149,7 @@
                 from: "QAYERDAN", to: "QAYERGA", departure_date: "KETISH SANASI",
                 search_btn: "🔍 Qidirish", nav_search: "Qidiruv", nav_kuzatuv: "Kuzatuv", nav_stars: "Premium",
                 no_trains: "Poyezd topilmadi.", no_tickets: "Chiptalar qolmagan",
-                lower: "Pastki", upper: "Tepadagi", sitting: "O'tirish", price_suffix: "so'm",
+                lower: "Pastki", upper: "Tepadagi", sitting: "O'tirish", price_suffix: "so'm", pref_seat: "Joy turi",
                 start_monitor: "Kuzatuvni yoqish", monitoring_title: "Faol kuzatuvlar",
                 empty_monitor: "Hali kuzatuvlar yo'q.", delete: "O'chirish",
                 wait: "Kutilmoqda...", loading: "Qidirilmoqda...",
@@ -1169,7 +1169,7 @@
                 from: "ҚАЕРДАН", to: "ҚАЕРГА", departure_date: "КЕТИШ САНАСИ",
                 search_btn: "🔍 Қидириш", nav_search: "Қидирув", nav_kuzatuv: "Кузатув", nav_stars: "Premium",
                 no_trains: "Поезд топилмади.", no_tickets: "Чипталар қолмаган",
-                lower: "Пастки", upper: "Тепадаги", sitting: "Ўтириш", price_suffix: "сўм",
+                lower: "Пастки", upper: "Тепадаги", sitting: "Ўтириш", price_suffix: "сўм", pref_seat: "Жой тури",
                 start_monitor: "Кузатувни ёқиш", monitoring_title: "Фаол кузатувлар",
                 empty_monitor: "Ҳали кузатувлар йўқ.", delete: "Ўчириш",
                 wait: "Кутилмоқда...", loading: "Қидирилмоқда...",
@@ -1185,7 +1185,7 @@
                 from: "ОТКУДА", to: "КУДА", departure_date: "ДАТА ОТПРАВЛЕНИЯ",
                 search_btn: "🔍 Поиск", nav_search: "Поиск", nav_kuzatuv: "Слежение", nav_stars: "Premium",
                 no_trains: "Поезда не найдены.", no_tickets: "Билетов нет",
-                lower: "Нижнее", upper: "Верхнее", sitting: "Сидячее", price_suffix: "сум",
+                lower: "Нижнее", upper: "Верхнее", sitting: "Сидячее", price_suffix: "сум", pref_seat: "Тип места",
                 start_monitor: "Включить слежение", monitoring_title: "Активные слежения",
                 empty_monitor: "Нет активных слежений.", delete: "Удалить",
                 wait: "Ожидание...", loading: "Поиск...",
@@ -1201,7 +1201,7 @@
                 from: "FROM", to: "TO", departure_date: "DEPARTURE DATE",
                 search_btn: "🔍 Search", nav_search: "Search", nav_kuzatuv: "Monitor", nav_stars: "Premium",
                 no_trains: "No trains found.", no_tickets: "No tickets left",
-                lower: "Lower", upper: "Upper", sitting: "Sitting", price_suffix: "uzs",
+                lower: "Lower", upper: "Upper", sitting: "Sitting", price_suffix: "uzs", pref_seat: "Seat Type",
                 start_monitor: "Start Monitoring", monitoring_title: "Active Monitoring",
                 empty_monitor: "No active monitors.", delete: "Delete",
                 wait: "Waiting...", loading: "Searching...",
@@ -1217,7 +1217,7 @@
                 from: "QAYERDEN", to: "QAYERGE", departure_date: "KETIW SÁNESI",
                 search_btn: "🔍 Izlew", nav_search: "Izlew", nav_kuzatuv: "Baqlaw", nav_stars: "Premium", nav_support: "Járdem",
                 no_trains: "Poyezd tabılmadı.", no_tickets: "Biletler qalmaǵan",
-                lower: "Tómengi", upper: "Joqarǵı", sitting: "Otırıw", price_suffix: "som",
+                lower: "Tómengi", upper: "Joqarǵı", sitting: "Otırıw", price_suffix: "som", pref_seat: "Orın túri",
                 start_monitor: "Baqlawdı qosıw", monitoring_title: "Aktiv baqlawlar",
                 empty_monitor: "Ele baqlawlar joq.", delete: "Óshiriw",
                 wait: "Kutilmekte...", loading: "Izlenbekte...",
@@ -1497,6 +1497,15 @@
             <div class="seat-grid">${seatHtml || noSeats}</div>
             
             <div class="chip-group">
+                <span class="form-label" data-i18n="pref_seat">Joy turi</span>
+                <div class="chips" id="prefs-${t.number}">
+                    <span class="chip active" onclick="togglePref(this)" data-pref="lower">${i18n('lower')}</span>
+                    <span class="chip active" onclick="togglePref(this)" data-pref="upper">${i18n('upper')}</span>
+                    <span class="chip active" onclick="togglePref(this)" data-pref="sitting">${i18n('sitting')}</span>
+                </div>
+            </div>
+
+            <div class="chip-group">
                 <span class="form-label" data-i18n="interval">${i18n('interval')}</span>
                 <div class="chips" id="int-${t.number}">
                     <span class="chip ${!isPremium ? 'locked' : ''}" onclick="setChip(this,15)">15s${!isPremium ? ' 🔒' : ''}</span>
@@ -1518,6 +1527,10 @@
             el.classList.add('active');
         }
 
+        function togglePref(el) {
+            el.classList.toggle('active');
+        }
+
         async function addWatch(num) {
             const btn = document.getElementById(`btn-${num}`);
             if (btn.disabled || btn.classList.contains('added')) return;
@@ -1525,14 +1538,30 @@
             btn.disabled = true;
             btn.innerText = i18n('wait');
 
+            let prefs = [];
+            const prefContainer = document.getElementById(`prefs-${num}`);
+            if (prefContainer) {
+                const chips = prefContainer.querySelectorAll('.chip.active');
+                chips.forEach(c => prefs.push(c.getAttribute('data-pref')));
+            }
+            if (prefs.length === 0) prefs = ["lower", "upper", "sitting"];
+
+            let interval = 60;
+            const intContainer = document.getElementById(`int-${num}`);
+            if (intContainer) {
+                const activeInt = intContainer.querySelector('.chip.active');
+                if (activeInt && activeInt.innerText.includes('15')) interval = 15;
+                if (activeInt && activeInt.innerText.includes('30')) interval = 30;
+            }
+
             const r = await fetch('/api/subs', {
                 method: 'POST', body: JSON.stringify({
                     user_id: tg.initDataUnsafe?.user?.id || 0,
                     from: document.getElementById('from').value, to: document.getElementById('to').value,
                     date: document.getElementById('date').value,
                     train_num: num,
-                    interval: 60,
-                    prefs: ["lower", "upper", "sitting"],
+                    interval: interval,
+                    prefs: prefs,
                     auto_book: false
                 })
             });

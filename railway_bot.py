@@ -1338,7 +1338,17 @@ async def run_auto_booking(sub_id, passenger_data=None):
                     break
             
             if not clicked_train:
-                await bot.send_message(uid, f"❌ <b>Xato:</b> {t_num} poyezdni tanlab bo'lmadi. (Selector topilmadi)")
+                await page.screenshot(path="train_error.png")
+                from aiogram.types import FSInputFile
+                await bot.send_photo(uid, FSInputFile("train_error.png"), caption=f"❌ <b>Xato:</b> {t_num} poyezdni tanlab bo'lmadi. Sahifa holati:")
+                
+                # Qoshimcha debug ma'lumot
+                train_items = await page.query_selector_all('*')
+                all_text = await page.evaluate("() => document.body.innerText")
+                with open("error_text.txt", "w", encoding="utf-8") as f:
+                    f.write(all_text)
+                await bot.send_document(uid, FSInputFile("error_text.txt"), caption="Sahifa matni")
+                
                 return
             await page.wait_for_timeout(3000)
 
