@@ -859,15 +859,8 @@
         }
 
         /* TV Player Styles */
-        #tv-view {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--tg-bg);
-            z-index: 3000;
-            display: none;
+        #tv-section {
+            padding: 0 !important;
             flex-direction: column;
         }
 
@@ -878,6 +871,9 @@
             align-items: center;
             gap: 15px;
             border-bottom: 1px solid rgba(127, 127, 127, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .tv-player-wrapper {
@@ -1050,10 +1046,6 @@
                 </div>
 
                 <div class="support-grid">
-                    <div class="support-tile" onclick="openTV()">
-                        <div class="tile-icon">📺</div>
-                        <div class="tile-label" data-i18n="tv_label">TV</div>
-                    </div>
                     <div class="support-tile disabled">
                         <div class="badge-soon" data-i18n="soon">Tez orada</div>
                         <div class="tile-icon">📢</div>
@@ -1145,6 +1137,25 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TV Section -->
+            <div id="tv-section" class="section">
+                <div class="tv-header">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #ff3b30, #ff9500); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff;">📺</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 15px;" data-i18n="tv_title">Jonli efir</div>
+                        <div style="font-size: 12px; opacity: 0.6;" data-i18n="tv_subtitle">Bepul kanallar</div>
+                    </div>
+                </div>
+                <div class="tv-player-wrapper">
+                    <video id="tv-player" controls playsinline autoplay></video>
+                </div>
+                <div class="tv-now-playing">
+                    <span class="tv-live-badge">LIVE</span>
+                    <span class="tv-now-name" id="tv-now-name">—</span>
+                </div>
+                <div class="tv-channel-list" id="tv-channel-list"></div>
+            </div>
         </div> <!-- app-container end -->
     </div> <!-- app end -->
 
@@ -1173,25 +1184,7 @@
         </div>
     </div>
 
-    <!-- TV View -->
-    <div id="tv-view">
-        <div class="tv-header">
-            <div onclick="closeTV()" style="cursor: pointer; font-size: 20px;">←</div>
-            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #ff3b30, #ff9500); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff;">📺</div>
-            <div>
-                <div style="font-weight: 700; font-size: 15px;" data-i18n="tv_title">Jonli efir</div>
-                <div style="font-size: 12px; opacity: 0.6;" data-i18n="tv_subtitle">Bepul kanallar</div>
-            </div>
-        </div>
-        <div class="tv-player-wrapper">
-            <video id="tv-player" controls playsinline autoplay></video>
-        </div>
-        <div class="tv-now-playing">
-            <span class="tv-live-badge">LIVE</span>
-            <span class="tv-now-name" id="tv-now-name">—</span>
-        </div>
-        <div class="tv-channel-list" id="tv-channel-list"></div>
-    </div>
+    <!-- TV View Removed (now a section) -->
 
     <!-- Bottom Navigation -->
     <div class="bottom-nav">
@@ -1211,6 +1204,10 @@
         <div class="nav-item" onclick="navTo('profile-section', this)">
             <span class="nav-icon">👤</span>
             <span class="nav-label" data-i18n="nav_profile">Profil</span>
+        </div>
+        <div class="nav-item" onclick="navTo('tv-section', this)">
+            <span class="nav-icon">📺</span>
+            <span class="nav-label" data-i18n="tv_label">TV</span>
         </div>
         <div class="nav-item" onclick="navTo('support-section', this)">
             <span class="nav-icon">🎧</span>
@@ -1507,12 +1504,21 @@
         }
 
         function navTo(id, el) {
+            // Stop TV if leaving TV section
+            if (id !== 'tv-section') {
+                const video = document.getElementById('tv-player');
+                if (video) video.pause();
+                if (currentHls) { currentHls.destroy(); currentHls = null; }
+                currentChIdx = -1;
+            }
+
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             el.classList.add('active');
             if (id === 'subs-section') loadSubs();
             if (id === 'profile-section') loadProfile();
+            if (id === 'tv-section') openTV();
         }
 
         async function loadProfile() {
@@ -2020,16 +2026,14 @@
         let currentChIdx = -1;
 
         function openTV() {
-            const tvView = document.getElementById('tv-view');
-            tvView.style.display = 'flex';
             renderChannelList();
             if (currentChIdx < 0) playChannel(0);
         }
 
+        // closeTV is now implicitly handled by navTo, but we keep it for safety if needed
         function closeTV() {
-            document.getElementById('tv-view').style.display = 'none';
             const video = document.getElementById('tv-player');
-            video.pause();
+            if (video) video.pause();
             if (currentHls) { currentHls.destroy(); currentHls = null; }
             currentChIdx = -1;
         }
