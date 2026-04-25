@@ -275,7 +275,8 @@ async def init_db():
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir)
-    async with aiosqlite.connect(DB_PATH) as conn:
+    async with aiosqlite.connect(DB_PATH, timeout=20) as conn:
+        await conn.execute("PRAGMA journal_mode=WAL;")
         await conn.execute("""CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT,
             coins INTEGER DEFAULT 0,
@@ -338,7 +339,7 @@ async def init_db():
         await conn.commit()
 
 async def db(query, params=(), fetch=False):
-    async with aiosqlite.connect(DB_PATH) as conn:
+    async with aiosqlite.connect(DB_PATH, timeout=20) as conn:
         cursor = await conn.execute(query, params)
         result = await cursor.fetchall() if fetch else None
         await conn.commit()
