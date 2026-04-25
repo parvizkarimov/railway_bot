@@ -332,6 +332,9 @@ async def init_db():
         except: pass
         try: await conn.execute("ALTER TABLE users ADD COLUMN r_password TEXT")
         except: pass
+        # Botni bloklaganlar statusi
+        try: await conn.execute("ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0")
+        except: pass
         await conn.commit()
 
 async def db(query, params=(), fetch=False):
@@ -629,16 +632,19 @@ async def cmd_admin_users(msg: types.Message):
     users = await db("""
         SELECT u.user_id, u.username, u.premium_until, 
         (SELECT COUNT(*) FROM subscriptions s WHERE s.user_id = u.user_id AND s.is_active = 1) as sub_count,
-        u.full_name
+        u.full_name, IFNULL(u.is_blocked, 0) as is_blocked
         FROM users u
     """, fetch=True)
     if not users:
         return await msg.answer("Foydalanuvchilar topilmadi.")
     
     total = len(users)
-    text = f"<b>👥 Jami foydalanuvchilar:</b> {total}\n\n"
+    blocked_count = sum(1 for u in users if u[5] == 1)
     
-    for u_id, u_username, p_until, sub_count, u_full_name in users[:50]:
+    text = f"<b>👥 Jami foydalanuvchilar:</b> {total}\n"
+    text += f"<b>🚫 Botni bloklaganlar:</b> {blocked_count}\n\n"
+    
+    for u_id, u_username, p_until, sub_count, u_full_name, is_blocked in users[:50]:
         status = "Oddiy"
         if p_until:
             try:
@@ -652,12 +658,22 @@ async def cmd_admin_users(msg: types.Message):
         name = name.replace("<", "&lt;").replace(">", "&gt;")
         user_link = f" @{u_username}" if u_username else ""
         
-        text += f"👤 {name}{user_link} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta\n"
+        block_icon = " 🚫 Bloklagan" if is_blocked else ""
+        text += f"👤 {name}{user_link} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta{block_icon}\n"
     
     if total > 50:
         text += f"\n... va yana {total-50} ta foydalanuvchi."
         
     await msg.answer(text, parse_mode="HTML")
+
+@dp.my_chat_member()
+async def on_my_chat_member(update: types.ChatMemberUpdated):
+    user_id = update.from_user.id
+    if update.new_chat_member.status in ["kicked", "left"]:
+        await db("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (user_id,))
+    elif update.new_chat_member.status in ["member", "administrator"]:
+        await db("UPDATE users SET is_blocked = 0 WHERE user_id = ?", (user_id,))
+
 
 @dp.message(Command("send"))
 async def cmd_broadcast(msg: types.Message):
@@ -688,6 +704,8 @@ async def cmd_broadcast(msg: types.Message):
         except Exception as e:
             errors += 1
             logging.error(f"Broadcast error for {user[0]}: {e}")
+            if "block" in str(e).lower() or "forbidden" in str(e).lower() or "not found" in str(e).lower():
+                await db("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (user[0],))
             
     await status_msg.edit_text(f"✅ Xabar yuborildi!\n\n🚀 Muvaffaqiyatli: {count}\n❌ Xatolik (bloklaganlar): {errors}")
 
@@ -808,7 +826,11 @@ async def process_subscription(sub, now):
             if s_auto_book:
                 await bot.send_message(uid, "⚡️ <b>Avtomatik olish boshlandi...</b>\nIltimos, kuting.", parse_mode="HTML")
                 asyncio.create_task(run_auto_booking(sid))
-        except Exception as e: logging.error(f"Xabar yuborishda xato: {e}")
+        except Exception as e: 
+            logging.error(f"Xabar yuborishda xato: {e}")
+            if "block" in str(e).lower() or "forbidden" in str(e).lower() or "not found" in str(e).lower():
+                await db("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (uid,))
+                await db("UPDATE subscriptions SET is_active=0 WHERE id=?", (sid,))
     else:
         logging.info(f"Sub {sid}: Bo'sh joy topilmadi")
 
