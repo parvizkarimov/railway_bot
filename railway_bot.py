@@ -628,7 +628,7 @@ async def handle_payment_text(msg: types.Message):
 async def cmd_admin_users(msg: types.Message):
     logging.info(f"Admin command call: /users from {msg.from_user.id}")
     if msg.from_user.id != ADMIN_ID:
-        return await msg.answer(f"❌ Siz admin emassiz.\nID: `{msg.from_user.id}`\nAdmin ID: `{ADMIN_ID}`")
+        return await msg.answer("❌ Siz admin emassiz.")
     
     users = await db("""
         SELECT u.user_id, u.username, u.premium_until, 
