@@ -640,12 +640,16 @@ async def cmd_admin_users(msg: types.Message):
         return await msg.answer("Foydalanuvchilar topilmadi.")
     
     total = len(users)
-    blocked_count = sum(1 for u in users if u[5] == 1)
+    blocked_users = [u for u in users if u[5] == 1]
+    active_users = [u for u in users if u[5] == 0]
+    blocked_count = len(blocked_users)
     
     text = f"<b>👥 Jami foydalanuvchilar:</b> {total}\n"
-    text += f"<b>🚫 Botni bloklaganlar:</b> {blocked_count}\n\n"
+    text += f"<b>🚫 Botni bloklaganlar:</b> {blocked_count}\n"
+    text += f"<b>✅ Faol foydalanuvchilar:</b> {total - blocked_count}\n\n"
     
-    for u_id, u_username, p_until, sub_count, u_full_name, is_blocked in users[:50]:
+    text += "<b>📋 Oxirgi faol foydalanuvchilar (top 50):</b>\n"
+    for u_id, u_username, p_until, sub_count, u_full_name, is_blocked in active_users[:50]:
         status = "Oddiy"
         if p_until:
             try:
@@ -658,12 +662,17 @@ async def cmd_admin_users(msg: types.Message):
         name = u_full_name if u_full_name else "Foydalanuvchi"
         name = name.replace("<", "&lt;").replace(">", "&gt;")
         user_link = f" @{u_username}" if u_username else ""
-        
-        block_icon = " 🚫 Bloklagan" if is_blocked else ""
-        text += f"👤 {name}{user_link} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta{block_icon}\n"
+        text += f"👤 {name}{user_link} (<code>{u_id}</code>) — {status} | 🔔 {sub_count} ta\n"
+
+    if blocked_users:
+        text += f"\n<b>🚫 Bloklaganlar:</b>\n"
+        for u_id, u_username, p_until, sub_count, u_full_name, is_blocked in blocked_users:
+            name = u_full_name if u_full_name else "Foydalanuvchi"
+            user_link = f" @{u_username}" if u_username else ""
+            text += f"❌ {name}{user_link} (<code>{u_id}</code>)\n"
     
-    if total > 50:
-        text += f"\n... va yana {total-50} ta foydalanuvchi."
+    if len(active_users) > 50:
+        text += f"\n... va yana {len(active_users)-50} ta faol foydalanuvchi."
         
     await msg.answer(text, parse_mode="HTML")
 
@@ -687,28 +696,45 @@ async def cmd_broadcast(msg: types.Message):
     if not text:
         return await msg.answer("❌ Xabar matnini yozing. Masalan: `/send Salom barchaga!`", parse_mode="Markdown")
     
-    users = await db("SELECT user_id FROM users", fetch=True)
+    users = await db("SELECT user_id, full_name, username FROM users", fetch=True)
     if not users:
         return await msg.answer("Foydalanuvchilar topilmadi.")
     
     count = 0
     errors = 0
+    blocked_list = []
     status_msg = await msg.answer(f"⏳ Xabar yuborilmoqda... (Jami: {len(users)})")
     
-    for user in users:
+    for u_id, u_full_name, u_username in users:
         try:
-            await bot.send_message(user[0], text, parse_mode="HTML")
+            await bot.send_message(u_id, text, parse_mode="HTML")
             count += 1
-            # Bot bloklanib qolmasligi uchun kichik pauza (har 20 xabarda)
             if count % 20 == 0:
                 await asyncio.sleep(0.5)
         except Exception as e:
             errors += 1
-            logging.error(f"Broadcast error for {user[0]}: {e}")
-            if "block" in str(e).lower() or "forbidden" in str(e).lower() or "not found" in str(e).lower():
-                await db("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (user[0],))
+            name = u_full_name if u_full_name else "Foydalanuvchi"
+            user_info = f"{name} (<code>{u_id}</code>)"
+            if u_username: user_info += f" @{u_username}"
+            blocked_list.append(user_info)
             
-    await status_msg.edit_text(f"✅ Xabar yuborildi!\n\n🚀 Muvaffaqiyatli: {count}\n❌ Xatolik (bloklaganlar): {errors}")
+            logging.error(f"Broadcast error for {u_id}: {e}")
+            # Har qanday "forbidden" yoki "blocked" xatosi bo'lsa DB ni yangilaymiz
+            err_str = str(e).lower()
+            if "forbidden" in err_str or "block" in err_str or "not found" in err_str or "deactivated" in err_str:
+                await db("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (u_id,))
+            
+    result_text = f"✅ <b>Xabar yuborildi!</b>\n\n"
+    result_text += f"🚀 Muvaffaqiyatli: {count}\n"
+    result_text += f"❌ Xatolik (bloklaganlar): {errors}\n\n"
+    
+    if blocked_list:
+        result_text += "<b>🚫 Bloklaganlar ro'yxati:</b>\n"
+        result_text += "\n".join(blocked_list[:30]) # Maksimal 30 tasini ko'rsatamiz xabar sig'ishi uchun
+        if len(blocked_list) > 30:
+            result_text += f"\n... va yana {len(blocked_list)-30} ta."
+            
+    await status_msg.edit_text(result_text, parse_mode="HTML")
 
 @dp.callback_query(F.data == "my_subs")
 async def cb_my_subs(cb: types.CallbackQuery):
