@@ -811,7 +811,10 @@ async def process_subscription(sub, now):
     logging.info(f"Sub {sid}: API dan {len(trains)} ta poyezd keldi")
     
     if s_train_num:
-        trains = [t for t in trains if str(t.get("number")).strip() == str(s_train_num).strip()]
+        if s_train_num == "JM_DUMMY":
+            trains = [t for t in trains if "jaloliddin" in str(t.get("brand", "")).lower() or "manguberdi" in str(t.get("brand", "")).lower() or "156" in str(t.get("number", "")) or "155" in str(t.get("number", ""))]
+        else:
+            trains = [t for t in trains if str(t.get("number")).strip() == str(s_train_num).strip()]
         logging.info(f"Sub {sid}: Filtrlashdan so'ng {len(trains)} ta poyezd qoldi")
     
     prefs = json.loads(s_prefs)
@@ -904,8 +907,35 @@ async def handle_webapp(request):
 async def handle_trains_api(request):
     try:
         body = await request.json()
-        result = await check_trains(body.get("from"), body.get("to"), body.get("date"))
+        f_code = body.get("from")
+        t_code = body.get("to")
+        t_date = body.get("date")
+        
+        result = await check_trains(f_code, t_code, t_date)
         trains = parse_trains(result) if result else []
+        
+        # Jaloliddin Manguberdi poyezdini qo'shish (agar yo'q bo'lsa)
+        jm_found = any("jaloliddin" in str(t.get("brand", "")).lower() or "manguberdi" in str(t.get("brand", "")).lower() or "156" in str(t.get("number", "")) or "155" in str(t.get("number", "")) for t in trains)
+        if not jm_found:
+            # Toshkent: 2900000, Urgench: 2900790, Xiva: 2900172
+            if f_code == "2900000" and t_code in ["2900790", "2900172"]:
+                trains.append({
+                    "brand": "Jaloliddin Manguberdi",
+                    "number": "JM_DUMMY",
+                    "departureDate": f"{t_date} 07:00",
+                    "arrivalDate": f"{t_date} 14:00",
+                    "timeOnWay": "7 soat",
+                    "cars": []
+                })
+            elif f_code in ["2900790", "2900172"] and t_code == "2900000":
+                trains.append({
+                    "brand": "Jaloliddin Manguberdi",
+                    "number": "JM_DUMMY",
+                    "departureDate": f"{t_date} 07:20",
+                    "arrivalDate": f"{t_date} 14:51",
+                    "timeOnWay": "7 soat",
+                    "cars": []
+                })
         
         # WebApp uchun narxlarni oldindan hisoblab chiqish
         for t in trains:
