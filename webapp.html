@@ -1086,7 +1086,7 @@
                 </div>
             </div>
 
-            <div id="profile-section" class="section">
+            <div id="profile-section" class="section" style="display: none !important;">
                 <div class="glass-card">
                     <h2 style="margin-bottom: 20px;" data-i18n="profile_title">Mening ma'mulotlarim</h2>
                     
@@ -1201,7 +1201,7 @@
             <span class="nav-icon">⭐</span>
             <span class="nav-label" data-i18n="nav_stars">Stars</span>
         </div>
-        <div class="nav-item" onclick="navTo('profile-section', this)">
+        <div class="nav-item" onclick="navTo('profile-section', this)" style="display: none !important;">
             <span class="nav-icon">👤</span>
             <span class="nav-label" data-i18n="nav_profile">Profil</span>
         </div>
@@ -1824,7 +1824,7 @@
                 <div class="sub-del" onclick="delSub(${s.id})">×</div>
             </div>
             <div style="width: 100%; margin-top: 10px;">
-                <button class="btn-main" style="padding: 8px; font-size: 12px; background: var(--accent-green);" 
+                <button class="btn-main" style="padding: 8px; font-size: 12px; background: var(--accent-green); display: none !important;" 
                         onclick="openBooking(${s.id}, '${s.train_num || ''}', '${s.from_st}', '${s.to_st}', '${s.date}')">
                     🎟️ ${i18n('autobook')}
                 </button>
