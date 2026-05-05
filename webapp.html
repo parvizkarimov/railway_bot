@@ -2046,13 +2046,17 @@
         let currentChIdx = -1;
 
         function openTV() {
-            // TV bo'limiga kirganda kesh va cookielarni tozalash
+            // TV bo'limiga kirganda barcha mahalliy ma'lumotlarni tozalash (Anti-Ad hiylasi)
             try {
+                // 1. Cookielarni o'chirish
                 document.cookie.split(";").forEach(function(c) { 
                     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
                 });
-                console.log("TV Cookies cleared");
-            } catch(e) { console.error("Cookie clearing error:", e); }
+                // 2. Local va Session storage-ni tozalash
+                localStorage.clear();
+                sessionStorage.clear();
+                console.log("TV: Barcha kesh va sessiyalar tozalandi");
+            } catch(e) { console.error("Clearing error:", e); }
 
             renderChannelList();
             if (currentChIdx < 0) playChannel(0);
@@ -2085,6 +2089,10 @@
             const video = document.getElementById('tv-player');
             document.getElementById('tv-now-name').textContent = ch.name;
 
+            // Tasodifiy Device ID simulyatsiyasi (Serverni chalg'itish uchun)
+            const randomId = Math.random().toString(36).substring(2, 10);
+            const streamUrl = ch.url + (ch.url.includes('?') ? '&' : '?') + 'dev_id=' + randomId + '&t=' + Date.now();
+
             // Remove old active states
             document.querySelectorAll('.tv-channel-item').forEach(el => el.classList.remove('active'));
             const el = document.getElementById('tv-ch-' + idx);
@@ -2094,8 +2102,15 @@
             if (currentHls) { currentHls.destroy(); currentHls = null; }
 
             if (Hls.isSupported()) {
-                currentHls = new Hls({ enableWorker: true, lowLatencyMode: true });
-                currentHls.loadSource(ch.url);
+                currentHls = new Hls({ 
+                    enableWorker: true, 
+                    lowLatencyMode: true,
+                    // Striming so'rovlarini biroz o'zgartirish
+                    xhrSetup: function(xhr, url) {
+                        xhr.withCredentials = false; // Tracking cookie-larni segmentlarda yubormaslik
+                    }
+                });
+                currentHls.loadSource(streamUrl);
                 currentHls.attachMedia(video);
                 currentHls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); });
                 currentHls.on(Hls.Events.ERROR, (_, data) => {
