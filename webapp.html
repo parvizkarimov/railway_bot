@@ -2046,6 +2046,14 @@
         let currentChIdx = -1;
 
         function openTV() {
+            // TV bo'limiga kirganda kesh va cookielarni tozalash
+            try {
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                console.log("TV Cookies cleared");
+            } catch(e) { console.error("Cookie clearing error:", e); }
+
             renderChannelList();
             if (currentChIdx < 0) playChannel(0);
         }
