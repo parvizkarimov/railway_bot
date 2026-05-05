@@ -1,52 +1,54 @@
-# 🚂 Railway Bilet Kuzatuvchi - Loyiha Arxitekturasi
+# 🚂 Railway Monitoring Bot - Agent Yo'riqnomasi
 
-Ushbu hujjat botning ishlash prinsipi, texnologik steki va tarkibiy qismlari haqida batafsil ma'lumot beradi.
+Ushbu loyiha O'zbekiston Temir Yo'llari (eticket.railway.uz) uchun chiptalarni monitoring qilish va Telegram bot orqali xabar berish tizimidir.
 
 ## 🛠 Texnologik Stek
-- **Til:** Python 3.10+
-- **Bot Framework:** `aiogram 3.x` (Asinxron Telegram bot)
-- **Web Server:** `aiohttp` (WebApp va API uchun)
-- **Ma'lumotlar bazasi:** `aiosqlite` (SQLite bazasi doimiy Volume bilan)
-- **Brauzer Avtomatizatsiyasi:** `Playwright` (Anti-bot tizimini chetlab o'tish uchun)
-- **Frontend:** HTML5, CSS3 (Vanilla), JavaScript (Telegram WebApp API)
+- **Backend:** Python 3.11+ (`aiogram` bot, `aiohttp` web server, `aiosqlite` ma'lumotlar bazasi)
+- **Frontend:** Vanilla HTML5, CSS3, JavaScript (Telegram WebApp API orqali)
+- **Avtomatizatsiya:** `Playwright` (Anti-bot cookie yangilash uchun)
+- **Video:** `Hls.js` (Jonli TV streaming uchun)
 
 ---
 
-## 🏗 Loyiha Tuzilishi
+## 🏗 Loyiha Arxitekturasi
 
 ### 1. Bot Qatlami (`railway_bot.py`)
-Botning asosiy interfeysi. Foydalanuvchilarni ro'yxatga olish, Premium obuna (Telegram Stars orqali) va admin buyruqlari bilan ishlaydi.
-- `/start`: Foydalanuvchini WebApp'ga yo'naltiruvchi asosiy menyu.
-- `/stars`: Yulduzlar sotib olish va premium muddatni uzaytirish.
-- `/users`: Faqat admin uchun foydalanuvchilar statistikasini ko'rish.
+Bot foydalanuvchilar bilan asosiy muloqotni amalga oshiradi:
+- `/start`: WebApp-ni ochadi.
+- `/stars`: Premium obuna sotib olish (Telegram Stars).
+- `/users` (Admin): Statistikani ko'rish.
 
-### 2. Checker (Kuzatuvchi) Qatlami
-Orqa fonda (background) ishlovchi asinxron loop. 
-- Foydalanuvchi tanlagan intervalga (15s, 30s, 60s) qarab Railway API'ga so'rov yuboradi.
-- Bo'sh joy topilganda darhol foydalanuvchiga poyezd turi, joylar soni va narxi bilan xabar yuboradi.
+### 2. Web Server (API)
+WebApp uchun backend xizmatini bajaradi:
+- `/api/trains`: Poyezdlarni qidirish.
+- `/api/subs`: Monitoring qo'shish, o'chirish va ko'rish.
+- `/api/support`: Support chat xabarlari.
+- `/api/create_invoice`: Telegram Stars to'lovini yaratish.
 
-### 3. Cookie & Anti-Bot Qatlami
-Railway saytining qattiq himoyasini chetlab o'tish uchun maxsus tizim.
-- **`cookie_refresher`**: Har 20 daqiqada orqa fonda Playwright (headless brauzer) ochadi.
-- Saytga haqiqiy odamdek kirib, `laravel_session` va `XSRF-TOKEN` larni yangilab turadi.
+### 3. Monitoring (Checker)
+`checker()` asinxron funksiyasi orqa fonda har bir foydalanuvchining kuzatuvlarini tekshiradi. Joy topilganda foydalanuvchiga poyezd turi, soni va narxi bilan xabar yuboradi.
 
-### 4. WebApp (Frontend)
-Foydalanuvchi uchun zamonaviy va premium dizayndagi interfeys.
-- **Qidiruv:** Toshkent, Samarqand va boshqa shaharlar orasida poyezdlarni real vaqtda qidirish.
-- **Filtrlar:** O'rin turi (Pastki, Tepadagi, O'tirish) va narx bo'yicha filtrlash.
-- **Boshqaruv:** Faol kuzatuvlarni ko'rish, intervalni tahrirlash va o'chirish.
+### 4. Cookie Refresher (Playwright)
+Railway saytining qattiq himoyasini chetlab o'tish uchun `cookie_refresher()` har 20 daqiqada Playwright orqali yangi `laravel_session` va `XSRF-TOKEN` oladi. Bu loyihaning eng muhim qismlaridan biridir.
 
 ---
 
-## 💰 Monetizatsiya va Premium Tizimi
-Bot "Freemium" modelida ishlaydi:
-- **Oddiy foydalanuvchi:** Maksimal 2 ta kuzatuv va faqat 60 soniyalik interval.
-- **Premium foydalanuvchi:** Cheksiz kuzatuvlar va tezkor (15s, 30s) intervallar. 
-- **To'lov:** 1 Star (Yulduz) = 1 kunlik Premium.
+## 📜 Agentlar uchun Qoidalar (Rules)
+
+> [!IMPORTANT]
+> Quyidagi qoidalar loyihaning barqarorligini ta'minlash uchun zarur:
+
+1. **Funksionallikni Saqlash:** TV streaming (`tv-section`) va Support Chat (`chat-view`) funksiyalarini hech qachon o'chirib tashlamang. Ular foydalanuvchilarni ushlab turish (retention) uchun muhim.
+2. **HLS Player:** `webapp.html` faylidagi `Hls.js` integratsiyasiga tegmaslikka harakat qiling, chunki u maxsus CDN va Safari native qo'llab-quvvatlashi uchun optimallashtirilgan.
+3. **Playwright Zaruriyati:** `requirements.txt` va `Dockerfile` fayllaridan Playwright-ni olib tashlamang. Garchi avtomatik sotib olish (booking) o'chirilgan bo'lsa-da, monitoring tizimi ishlashi uchun cookie yangilash (refresher) kerak.
+4. **Hiding vs Deleting:** Agar biror bo'lim (masalan, Profil yoki Auto-book) kerak bo'lmasa, uni koddan o'chirib yubormasdan, CSS orqali yashiring (`display: none`). Bu kelajakda funksiyani qayta tiklashni osonlashtiradi.
+5. **DB Tranzaksiyalari:** Barcha ma'lumotlar bazasi so'rovlari uchun `aiosqlite` asinxron kutubxonasidan foydalaning va doim `try...except` bloklarida xatolarni boshqaring.
+6. **Aesthetics:** WebApp premium va zamonaviy ko'rinishi shart (glassmorphism effekti, animatsiyalar, dark mode).
 
 ---
 
-## 📦 Deployment va Persistence
-Loyiha **Railway.app** kabi platformalar uchun optimallashtirilgan.
-- **Volume:** Ma'lumotlar o'chib ketmasligi uchun `/data/bot.db` manzili ishlatiladi.
-- **Environments:** `BOT_TOKEN`, `WEBAPP_URL`, `ADMIN_ID`, `DB_PATH` kabi o'zgaruvchilar orqali sozlanadi.
+## 📦 Deployment
+Loyiha **Railway.app** uchun mo'ljallangan.
+- **Dockerfile:** `mcr.microsoft.com/playwright/python` tasviridan foydalanadi.
+- **Environment Variables:** `BOT_TOKEN`, `WEBAPP_URL`, `ADMIN_ID` sozlanishi shart.
+- **Volume:** `bot.db` fayli saqlanib qolishi uchun Railway-da `/app/data` (yoki default `/app`) papkasiga persistency qo'shilgan bo'liveradi.

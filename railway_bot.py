@@ -844,13 +844,28 @@ async def process_subscription(sub, now):
                             total_train_seats += pt_count
         
         if match_cars:
+            num = t.get('number', '?')
+            brand = t.get('brand', 'Poyezd')
             dep_time = t.get('departureDate', '')
             arr_time = t.get('arrivalDate', '')
-            found_text += f"✅ <b>{t.get('brand','Poyezd')}</b> — {total_train_seats} joy\n" + "\n".join(match_cars) + f"\n🕐 {dep_time} → {arr_time}\n\n"
+            duration = t.get('timeOnWay', '')
+            
+            found_text += f"✅ <b>{brand} (№{num})</b>\n"
+            found_text += f"📊 Bo'sh joylar: {total_train_seats} ta\n"
+            found_text += "\n".join(match_cars) + "\n"
+            found_text += f"🕒 {dep_time} ➔ {arr_time} ({duration})\n\n"
 
     if found_text:
         logging.info(f"Sub {sid}: Joy topildi! Xabar yuborilmoqda...")
-        msg = f"🔔 <b>Bo'sh joy topildi!</b>\n🚂 {f_st} → {t_st} ({s_date})\n\n{found_text}👉 https://eticket.railway.uz"
+        msg = (
+            f"🔔 <b>DIQQAT: BO'SH JOY TOPILDI!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📍 <b>Yo'nalish:</b> {f_st} ➔ {t_st}\n"
+            f"📅 <b>Sana:</b> {s_date}\n\n"
+            f"{found_text}"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🎫 <b>Sotib olish:</b> https://eticket.railway.uz"
+        )
         try: 
             await bot.send_message(uid, msg, parse_mode="HTML")
             if s_auto_book:
