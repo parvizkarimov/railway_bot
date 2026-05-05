@@ -1669,7 +1669,13 @@
             </div>
             
             <div class="train-actions" style="width: 100%; display: block;">
-                <button class="btn-track" id="btn-${t.number}" onclick="addWatch('${t.number}')" data-i18n="start_monitor">${i18n('start_monitor')}</button>
+                <button class="btn-track" id="btn-${t.number}" 
+                        onclick="addWatch('${t.number}')" 
+                        data-brand="${t.brand}" 
+                        data-dep="${t.departureDate.split(' ')[1]}" 
+                        data-arr="${t.arrivalDate.split(' ')[1]}" 
+                        data-dur="${t.timeOnWay}"
+                        data-i18n="start_monitor">${i18n('start_monitor')}</button>
             </div>
         </div>`;
             }).join('');
@@ -1726,6 +1732,10 @@
                     from: document.getElementById('from').value, to: document.getElementById('to').value,
                     date: document.getElementById('date').value,
                     train_num: num,
+                    brand: btn.getAttribute('data-brand'),
+                    dep_time: btn.getAttribute('data-dep'),
+                    arr_time: btn.getAttribute('data-arr'),
+                    duration: btn.getAttribute('data-dur'),
                     interval: interval,
                     prefs: prefs,
                     auto_book: false
@@ -1815,13 +1825,23 @@
         <div class="sub-card" style="flex-direction: column; align-items: flex-start;">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                 <div class="sub-info">
-                    <h3>${s.from_st} → ${s.to_st}</h3>
+                    <h3 style="font-size: 15px; margin-bottom: 4px;">${s.from_st} → ${s.to_st}</h3>
                     <div class="sub-meta">
-                        <span>${s.date}</span>
+                        <span style="font-weight: 600; color: var(--accent-blue);">📅 ${s.date}</span>
                         <span class="sub-int" onclick="cycleInterval(${s.id}, ${s.interval})">${s.interval}s ✏️</span>
                     </div>
+                    ${s.train_num ? `
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.05); width: 100%;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--tg-text);">
+                            🚆 ${s.brand || 'Poyezd'} (№${s.train_num})
+                        </div>
+                        <div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">
+                            🕒 ${s.dep_time || '--:--'} ➔ ${s.arr_time || '--:--'} (${s.duration || ''})
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
-                <div class="sub-del" onclick="delSub(${s.id})">×</div>
+                <div class="sub-del" onclick="delSub(${s.id})" style="align-self: flex-start; margin-top: -5px;">×</div>
             </div>
             <div style="width: 100%; margin-top: 10px;">
                 <button class="btn-main" style="padding: 8px; font-size: 12px; background: var(--accent-green); display: none !important;" 

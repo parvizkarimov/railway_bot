@@ -333,8 +333,16 @@ async def init_db():
         except: pass
         try: await conn.execute("ALTER TABLE users ADD COLUMN r_password TEXT")
         except: pass
-        # Botni bloklaganlar statusi
         try: await conn.execute("ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0")
+        except: pass
+        # Metadata ustunlari
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN dep_time TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN arr_time TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN duration TEXT")
+        except: pass
+        try: await conn.execute("ALTER TABLE subscriptions ADD COLUMN brand TEXT")
         except: pass
         await conn.commit()
 
@@ -971,7 +979,7 @@ async def handle_get_subs(request):
             is_premium = datetime.fromisoformat(premium_until) > datetime.now()
         except: pass
 
-    subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price,auto_book FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
+    subs = await db("SELECT id,from_st,to_st,from_code,to_code,date,check_interval,preferred_seats,max_price,auto_book,train_num,dep_time,arr_time,duration,brand FROM subscriptions WHERE user_id=? AND is_active=1", (int(uid),), fetch=True)
     res = []
     for s in (subs or []):
         prefs = json.loads(s[7])
@@ -980,7 +988,8 @@ async def handle_get_subs(request):
         res.append({
             "id":s[0],"from_st":s[1],"to_st":s[2],"from_code":s[3],"to_code":s[4],
             "date":s[5],"interval":s[6],"prefs":uz_prefs,"max_price":s[8],
-            "auto_book": bool(s[9])
+            "auto_book": bool(s[9]),
+            "train_num": s[10], "dep_time": s[11], "arr_time": s[12], "duration": s[13], "brand": s[14]
         })
     return web.json_response({"subs": res, "is_premium": is_premium, "premium_until": premium_until[:10] if premium_until else None})
 
@@ -1014,9 +1023,10 @@ async def handle_add_sub(request):
             return web.json_response({"ok": False, "error": "Qayerdan va Qayerga bir xil bo'lishi mumkin emas."})
         
         await db("""INSERT INTO subscriptions 
-            (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats, auto_book) 
-            VALUES (?,?,?,?,?,?,?,?,?,?)""", (
-            uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', [])) , 1 if b.get('auto_book') else 0
+            (user_id, from_st, to_st, from_code, to_code, date, train_num, check_interval, preferred_seats, auto_book, dep_time, arr_time, duration, brand) 
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+            uid, f_name, t_name, b['from'], b['to'], b['date'], b.get('train_num'), b.get('interval', 60), json.dumps(b.get('prefs', [])), 1 if b.get('auto_book') else 0,
+            b.get('dep_time'), b.get('arr_time'), b.get('duration'), b.get('brand')
         ))
         
         # Yangi ID ni olish va darhol tekshiruvni boshlash
