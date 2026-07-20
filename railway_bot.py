@@ -137,17 +137,28 @@ async def refresh_cookie():
                     except:
                         logging.warning(f"Urinish {attempt}: Networkidle timeout, lekin davom etamiz...")
 
+                    # Fallback sifatida JS orqali csrf-token ni so'raymiz
+                    try:
+                        await page.evaluate("fetch('/api/v1/csrf-token')")
+                    except:
+                        pass
+
                 except Exception as e:
                     logging.error(f"Urinish {attempt} goto xato: {e}")
                     await browser.close()
                     await asyncio.sleep(2)
                     continue
 
-                await asyncio.sleep(random.uniform(3, 7)) # Real userdek kutish
-                
-                cookies = await context.cookies()
-                cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
-                xsrf = unquote(next((c["value"] for c in cookies if c["name"] == "XSRF-TOKEN"), ""))
+                # Kuting, toki XSRF-TOKEN cookie paydo bo'lguncha (max 20 soniya)
+                cookie_str = ""
+                xsrf = ""
+                for _ in range(10):
+                    cookies = await context.cookies()
+                    cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
+                    xsrf = unquote(next((c["value"] for c in cookies if c["name"].upper() == "XSRF-TOKEN"), ""))
+                    if xsrf:
+                        break
+                    await asyncio.sleep(2)
                 
                 await browser.close()
 
