@@ -119,8 +119,8 @@ async def refresh_cookie():
 
                 # Timeoutni bo'lib ishlatamiz. networkidle o'rniga domcontentloaded va keyin kutish
                 try:
-                    response = await page.goto("https://eticket.railway.uz/uz/pages/trains-page", 
-                                             wait_until="domcontentloaded", 
+                    response = await page.goto("https://eticket.railway.uz/api/v1/csrf-token", 
+                                             wait_until="networkidle", 
                                              timeout=40000)
                     
                     if response and response.status == 403:
@@ -130,18 +130,6 @@ async def refresh_cookie():
                         await browser.close()
                         await asyncio.sleep(random.uniform(5, 10))
                         continue
-
-                    # Sahifa yuklanishini biroz kutamiz (networkidle har doim ham ishlamasligi mumkin)
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=15000)
-                    except:
-                        logging.warning(f"Urinish {attempt}: Networkidle timeout, lekin davom etamiz...")
-
-                    # Fallback sifatida JS orqali csrf-token ni so'raymiz
-                    try:
-                        await page.evaluate("fetch('/api/v1/csrf-token')")
-                    except:
-                        pass
 
                 except Exception as e:
                     logging.error(f"Urinish {attempt} goto xato: {e}")
